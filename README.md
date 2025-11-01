@@ -19,6 +19,14 @@ cargo 1.91.0 (ea2d97820 2025-10-10)
 rustc --version
 rustc 1.91.0 (f8297e351 2025-10-28)
 ```
+## **快速开始**
+
+```
+自行输入：
+cargo run
+示例评测：
+cargo run test
+```
 
 # <center>2025年赛题：大模型训推全局内存规划</center>
 
