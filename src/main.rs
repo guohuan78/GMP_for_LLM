@@ -5,10 +5,16 @@ mod tests;
 #[derive(Debug, Clone)]
 struct Req { addr: i64, size: i64, start: i64, time: i64 }
 
-fn solve(input: &str) -> String {
-    let mut output = Vec::new();
+#[derive(Debug, Clone)]
+struct Input {
+    l: i64,
+    m: i64,
+    reqs: Vec<Req>,
+}
+
+fn parse_input(input: &str) -> Input {
     let mut it = input.split_whitespace();
-    let _l: i64 = it.next().unwrap().parse().unwrap();
+    let l: i64 = it.next().unwrap().parse().unwrap();
     let m: i64 = it.next().unwrap().parse().unwrap();
     let n: usize = it.next().unwrap().parse().unwrap();
     let mut reqs: Vec<Req> = Vec::new();
@@ -17,15 +23,20 @@ fn solve(input: &str) -> String {
         let size: i64 = it.next().unwrap().parse().unwrap();
         let start: i64 = it.next().unwrap().parse().unwrap();
         let time: i64 = it.next().unwrap().parse().unwrap();
-        reqs.push(Req{addr,size,start,time});
+        reqs.push(Req{addr, size, start, time});
     }
+    Input { l, m, reqs }
+}
+
+fn solve(data: &Input) -> String {
+    let mut output = Vec::new();
 
     // 优化策略：尽量让 Reload 和 Visit 并行
     let mut last_rw_end: i64 = 0;
     let mut last_visit_end: i64 = 0;
     let mut hbm_occupied: Vec<(i64, i64, usize)> = Vec::new();
 
-    for (i, r) in reqs.iter().enumerate() {
+    for (i, r) in data.reqs.iter().enumerate() {
         let load_time = 40 * r.size;
         let ideal_reload_start = r.start - load_time;
         let reload_start = std::cmp::max(ideal_reload_start, last_rw_end);
@@ -42,8 +53,8 @@ fn solve(input: &str) -> String {
 
         let off_start = std::cmp::max(visit_end, last_rw_end);
         let current_hbm: i64 = hbm_occupied.iter().map(|(_, s, _)| s).sum();
-        let need_offload = if i + 1 < reqs.len() {
-            current_hbm + reqs[i + 1].size > m
+        let need_offload = if i + 1 < data.reqs.len() {
+            current_hbm + data.reqs[i + 1].size > data.m
         } else {
             true
         };
@@ -66,11 +77,17 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     
     if args.len() > 1 && args[1] == "test" {
-        tests::run_tests(solve);
+        // 测试模式：需要包装 solve 函数以兼容测试接口
+        tests::run_tests(|input| {
+            let data = parse_input(input);
+            solve(&data)
+        });
     } else {
+        // 正常模式：从标准输入读取
         let mut s = String::new();
         io::stdin().read_to_string(&mut s).unwrap();
-        let result = solve(&s);
+        let data = parse_input(&s);
+        let result = solve(&data);
         println!("{}", result);
     }
 }
