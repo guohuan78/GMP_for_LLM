@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, BufRead};
 
 mod tests;
 
@@ -26,6 +26,33 @@ fn parse_input(input: &str) -> Input {
         reqs.push(Req{addr, size, start, time});
     }
     Input { l, m, reqs }
+}
+
+fn read_input_interactive() -> String {
+    let stdin = io::stdin();
+    let mut lines = Vec::new();
+    let mut first_line = String::new();
+    
+    // 读取第一行获取 N
+    stdin.lock().read_line(&mut first_line).unwrap();
+    lines.push(first_line.trim().to_string());
+    
+    let parts: Vec<&str> = lines[0].split_whitespace().collect();
+    if parts.len() < 3 {
+        panic!("Invalid input format");
+    }
+    let n: usize = parts[2].parse().unwrap();
+    
+    // 读取接下来的 N 行
+    for _ in 0..n {
+        let mut line = String::new();
+        stdin.lock().read_line(&mut line).unwrap();
+        if !line.trim().is_empty() {
+            lines.push(line.trim().to_string());
+        }
+    }
+    
+    lines.join("\n")
 }
 
 fn solve(data: &Input) -> String {
@@ -84,9 +111,8 @@ fn main() {
         });
     } else {
         // 正常模式：从标准输入读取
-        let mut s = String::new();
-        io::stdin().read_to_string(&mut s).unwrap();
-        let data = parse_input(&s);
+        let input_str = read_input_interactive();
+        let data = parse_input(&input_str);
         let result = solve(&data);
         println!("{}", result);
     }
