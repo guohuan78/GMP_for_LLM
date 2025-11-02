@@ -1,9 +1,18 @@
+use std::collections::BTreeMap;
 use std::io::{self, BufRead};
 
 mod tests;
 
+// --- Data Structures ---
+
 #[derive(Debug, Clone)]
-struct Req { addr: i64, size: i64, start: i64, time: i64 }
+struct Req {
+    id: usize,
+    addr: i64,
+    size: i64,
+    start: i64,
+    time: i64,
+}
 
 #[derive(Debug, Clone)]
 struct Input {
@@ -12,230 +21,279 @@ struct Input {
     reqs: Vec<Req>,
 }
 
+// --- Input Parsing (Unchanged from original) ---
+
 fn read_and_parse_input() -> Input {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
+
     let mut first_line = String::new();
-    
     handle.read_line(&mut first_line).unwrap();
+
     let parts: Vec<&str> = first_line.trim().split_whitespace().collect();
     if parts.len() < 3 {
         panic!("Invalid input format");
     }
-    
+
     let l: i64 = parts[0].parse().unwrap();
     let m: i64 = parts[1].parse().unwrap();
     let n: usize = parts[2].parse().unwrap();
-    
+
     let mut reqs: Vec<Req> = Vec::new();
-    for _ in 0..n {
+    for i in 0..n {
         let mut line = String::new();
         handle.read_line(&mut line).unwrap();
+
         let nums: Vec<&str> = line.trim().split_whitespace().collect();
         if nums.len() >= 4 {
             let addr: i64 = nums[0].parse().unwrap();
             let size: i64 = nums[1].parse().unwrap();
             let start: i64 = nums[2].parse().unwrap();
             let time: i64 = nums[3].parse().unwrap();
-            reqs.push(Req{addr, size, start, time});
+
+            reqs.push(Req {
+                id: i,
+                addr,
+                size,
+                start,
+                time,
+            });
         }
     }
-    
+
     Input { l, m, reqs }
 }
 
 fn parse_input(input: &str) -> Input {
     let mut it = input.split_whitespace();
+
     let l: i64 = it.next().unwrap().parse().unwrap();
     let m: i64 = it.next().unwrap().parse().unwrap();
     let n: usize = it.next().unwrap().parse().unwrap();
+
     let mut reqs: Vec<Req> = Vec::new();
-    for _ in 0..n {
+    for i in 0..n {
         let addr: i64 = it.next().unwrap().parse().unwrap();
         let size: i64 = it.next().unwrap().parse().unwrap();
         let start: i64 = it.next().unwrap().parse().unwrap();
         let time: i64 = it.next().unwrap().parse().unwrap();
-        reqs.push(Req{addr, size, start, time});
+
+        reqs.push(Req {
+            id: i,
+            addr,
+            size,
+            start,
+            time,
+        });
     }
+
     Input { l, m, reqs }
 }
+
+// --- Core Logic: Helper Functions ---
+
+/// Merges overlapping or adjacent intervals in a vector.
+/// Ensures the representation of HBM memory is always compact and disjoint.
+fn merge_regions(regions: &mut Vec<(i64, i64)>) {
+    if regions.is_empty() {
+        return;
+    }
+
+    regions.sort_by_key(|k| k.0);
+    let mut merged = Vec::with_capacity(regions.len());
+    merged.push(regions[0]);
+
+    for &(addr, size) in regions.iter().skip(1) {
+        let last = merged.last_mut().unwrap();
+        let end = addr + size;
+        let last_end = last.0 + last.1;
+
+        if addr <= last_end {
+            // Overlap or adjacent, merge them
+            if end > last_end {
+                last.1 = end - last.0;
+            }
+        } else {
+            // Disjoint, add new region
+            merged.push((addr, size));
+        }
+    }
+
+    *regions = merged;
+}
+
+/// Finds which parts of a required memory segment are not currently in HBM.
+fn find_missing_segments(hbm_regions: &[(i64, i64)], req_addr: i64, req_size: i64) -> Vec<(i64, i64)> {
+    let mut missing = Vec::new();
+    let req_end = req_addr + req_size;
+    let mut current_pos = req_addr;
+
+    for &(loaded_addr, loaded_size) in hbm_regions {
+        if current_pos >= req_end {
+            break;
+        }
+
+        let loaded_end = loaded_addr + loaded_size;
+
+        // Check for a gap before the current loaded region
+        if current_pos < loaded_addr {
+            let gap_end = std::cmp::min(loaded_addr, req_end);
+            missing.push((current_pos, gap_end - current_pos));
+        }
+
+        // Move our position past the current loaded region
+        if loaded_end > current_pos {
+            current_pos = loaded_end;
+        }
+    }
+
+    // Check for any remaining gap at the end
+    if current_pos < req_end {
+        missing.push((current_pos, req_end - current_pos));
+    }
+
+    missing
+}
+
+/// Implements the core of Bélády's algorithm.
+/// For a given memory region, it looks into the future to find when it will be used next.
+fn find_next_use(addr: i64, size: i64, current_req_idx: usize, all_reqs: &[Req]) -> i64 {
+    let end = addr + size;
+
+    for req in all_reqs.iter().skip(current_req_idx + 1) {
+        let req_end = req.addr + req.size;
+
+        // Check for overlap
+        if std::cmp::max(addr, req.addr) < std::cmp::min(end, req_end) {
+            return req.start;
+        }
+    }
+
+    i64::MAX // If never used again, it's the best candidate for eviction
+}
+
+// --- Main Solver ---
 
 fn solve(data: &Input) -> String {
     let mut output = Vec::new();
     let mut last_rw_end: i64 = 0;
     let mut last_visit_end: i64 = 0;
-    
-    // 跟踪 HBM 中的内存区间 (addr, size)
+
+    // Tracks disjoint, sorted memory regions in HBM: Vec<(addr, size)>
     let mut hbm_regions: Vec<(i64, i64)> = Vec::new();
 
+    // Tracks requests currently in their 'Visit' phase to prevent eviction of their memory.
+    // BTreeMap<end_time, (addr, size)>
+    let mut active_requests: BTreeMap<i64, Vec<(i64, i64)>> = BTreeMap::new();
+
     for (i, r) in data.reqs.iter().enumerate() {
-        // 检查需要加载的部分
-        let req_end = r.addr + r.size;
-        let mut to_load: Vec<(i64, i64)> = Vec::new();
-        
-        // 将当前请求区间拆分为已覆盖和未覆盖部分
-        let mut current_pos = r.addr;
-        let mut regions_sorted = hbm_regions.clone();
-        regions_sorted.sort_by_key(|(a, _)| *a);
-        
-        for (loaded_addr, loaded_size) in regions_sorted {
-            let loaded_end = loaded_addr + loaded_size;
-            
-            // 检查是否与当前请求区间有重叠
-            if loaded_end > r.addr && loaded_addr < req_end {
-                let overlap_start = std::cmp::max(loaded_addr, r.addr);
-                let overlap_end = std::cmp::min(loaded_end, req_end);
-                
-                // 如果有未覆盖的部分，需要加载
-                if current_pos < overlap_start {
-                    to_load.push((current_pos, overlap_start - current_pos));
-                }
-                
-                current_pos = overlap_end;
-            }
-        }
-        
-        // 检查最后是否还有未覆盖部分
-        if current_pos < req_end {
-            to_load.push((current_pos, req_end - current_pos));
-        }
-        
-        // Reload 需要加载的部分
-        for (addr, size) in &to_load {
-            let load_t = 40 * size;
-            let ideal_start = r.start - load_t;
-            let reload_start = std::cmp::max(ideal_start, last_rw_end);
-            
-            output.push(format!("Reload {} {} {}", reload_start, addr, size));
-            last_rw_end = reload_start + load_t;
-            
-            // 添加到 HBM
-            hbm_regions.push((*addr, *size));
-        }
-        
-        // Visit
-        let visit_start = std::cmp::max(std::cmp::max(last_rw_end, r.start), last_visit_end);
-        output.push(format!("Visit {} {}", visit_start, i));
-        let visit_end = visit_start + r.time;
-        last_visit_end = visit_end;
-        
-        // Offload 策略：只在必要时卸载
-        let is_last = i == data.reqs.len() - 1;
-        
-        if !is_last {
-            let next_req = &data.reqs[i + 1];
-            let next_req_end = next_req.addr + next_req.size;
-            let current_hbm: i64 = hbm_regions.iter().map(|(_, s)| s).sum();
-            
-            // 计算下一个请求需要多少新空间
-            let mut next_need = next_req.size;
-            for (loaded_addr, loaded_size) in &hbm_regions {
-                let loaded_end = loaded_addr + loaded_size;
-                if loaded_end > next_req.addr && *loaded_addr < next_req_end {
-                    let overlap_start = std::cmp::max(*loaded_addr, next_req.addr);
-                    let overlap_end = std::cmp::min(loaded_end, next_req_end);
-                    next_need -= overlap_end - overlap_start;
-                }
-            }
-            
-            if current_hbm + next_need > data.m {
-                // 需要腾出空间
-                let need_free = current_hbm + next_need - data.m;
-                let mut freed: i64 = 0;
-                let mut offload_list = Vec::new();
-                let mut total_offload_time: i64 = 0;
-                
-                // 找出需要卸载的区域
-                for (addr, size) in &hbm_regions {
-                    if freed >= need_free {
-                        break;
-                    }
-                    
-                    let region_end = addr + size;
-                    
-                    // 检查这块内存是否与下一个请求重叠
-                    if region_end <= next_req.addr || *addr >= next_req_end {
-                        // 不重叠，可以完全卸载
-                        let to_free = std::cmp::min(*size, need_free - freed);
-                        offload_list.push((*addr, to_free));
-                        freed += to_free;
-                        total_offload_time += 40 * to_free;
-                    } else {
-                        // 重叠，只卸载不重叠的部分
-                        let overlap_start = std::cmp::max(*addr, next_req.addr);
-                        let overlap_end = std::cmp::min(region_end, next_req_end);
-                        
-                        // 左侧不重叠部分
-                        if *addr < overlap_start {
-                            let left_size = overlap_start - addr;
-                            let to_free = std::cmp::min(left_size, need_free - freed);
-                            offload_list.push((*addr, to_free));
-                            freed += to_free;
-                            total_offload_time += 40 * to_free;
-                            if freed >= need_free {
-                                continue;
+        // --- 1. Update State: Unlock memory from requests that have finished by now ---
+        let current_time = std::cmp::max(last_rw_end, last_visit_end);
+        active_requests = active_requests.split_off(&current_time);
+
+        // --- 2. Analysis Phase: Determine what to load and what to offload ---
+        let to_load = find_missing_segments(&hbm_regions, r.addr, r.size);
+        let total_load_size: i64 = to_load.iter().map(|&(_, s)| s).sum();
+
+        let mut to_offload: Vec<(i64, i64)> = Vec::new();
+
+        if total_load_size > 0 {
+            let current_hbm_size: i64 = hbm_regions.iter().map(|&(_, s)| s).sum();
+            let mut space_needed_to_free = (current_hbm_size + total_load_size) - data.m;
+
+            if space_needed_to_free > 0 {
+                // --- Bélády's Optimal Eviction Logic ---
+                let mut candidates = Vec::new();
+
+                'region_loop: for &(addr, size) in &hbm_regions {
+                    // Check if the region is locked by an active request
+                    for locked_regions in active_requests.values() {
+                        for &(locked_addr, locked_size) in locked_regions {
+                            if std::cmp::max(addr, locked_addr)
+                                < std::cmp::min(addr + size, locked_addr + locked_size)
+                            {
+                                continue 'region_loop; // This region is locked, skip it
                             }
                         }
-                        
-                        // 右侧不重叠部分
-                        if overlap_end < region_end {
-                            let right_size = region_end - overlap_end;
-                            let to_free = std::cmp::min(right_size, need_free - freed);
-                            offload_list.push((overlap_end, to_free));
-                            freed += to_free;
-                            total_offload_time += 40 * to_free;
-                        }
                     }
+
+                    // If not locked, it's a candidate for eviction
+                    let next_use = find_next_use(addr, size, i, &data.reqs);
+                    candidates.push((next_use, addr, size));
                 }
-                
-                // 计算两种策略的完成时间
-                let next_load_time = 40 * next_need;
-                
-                // 策略1：Offload与Visit并行
-                let parallel_rw_end = last_rw_end + total_offload_time;
-                let parallel_reload_start = std::cmp::max(next_req.start - next_load_time, parallel_rw_end);
-                let parallel_reload_end = parallel_reload_start + next_load_time;
-                let parallel_visit_start = std::cmp::max(std::cmp::max(parallel_reload_end, next_req.start), visit_end);
-                let parallel_visit_end = parallel_visit_start + next_req.time;
-                let parallel_fin = std::cmp::max(parallel_reload_end, parallel_visit_end);
-                
-                // 策略2：Offload在Visit后
-                let serial_off_start = std::cmp::max(visit_end, last_rw_end);
-                let serial_rw_end = serial_off_start + total_offload_time;
-                let serial_reload_start = std::cmp::max(next_req.start - next_load_time, serial_rw_end);
-                let serial_reload_end = serial_reload_start + next_load_time;
-                let serial_visit_start = std::cmp::max(std::cmp::max(serial_reload_end, next_req.start), visit_end);
-                let serial_visit_end = serial_visit_start + next_req.time;
-                let serial_fin = std::cmp::max(serial_reload_end, serial_visit_end);
-                
-                // 选择完成时间更早的策略
-                let off_start = if parallel_fin <= serial_fin {
-                    last_rw_end
-                } else {
-                    serial_off_start
-                };
-                
-                // 执行 Offload
-                for (addr, size) in &offload_list {
-                    let off_time = 40 * size;
-                    output.push(format!("Offload {} {} {}", off_start, addr, size));
-                    last_rw_end = off_start + off_time;
-                    
-                    // 从 HBM 中移除
-                    hbm_regions.retain(|(a, s)| !(*a == *addr && *s == *size));
+
+                // Sort candidates: furthest next use time first (descending)
+                candidates.sort_by_key(|k| -k.0);
+
+                for (_, addr, size) in candidates {
+                    if space_needed_to_free <= 0 {
+                        break;
+                    }
+
+                    to_offload.push((addr, size));
+                    space_needed_to_free -= size;
                 }
             }
         }
+
+        // --- 3. Scheduling Phase: Schedule I/O and Visit operations ---
+
+        // Schedule Offloads
+        if !to_offload.is_empty() {
+            let offload_start_time = last_rw_end;
+            let mut current_offload_time = offload_start_time;
+
+            for &(addr, size) in &to_offload {
+                let offload_duration = size * 40;
+                output.push(format!("Offload {} {} {}", current_offload_time, addr, size));
+                current_offload_time += offload_duration;
+            }
+
+            last_rw_end = current_offload_time;
+
+            // Update HBM state
+            hbm_regions.retain(|r| !to_offload.contains(r));
+        }
+
+        // Schedule Reloads (Just-in-Time)
+        if !to_load.is_empty() {
+            let total_reload_duration = total_load_size * 40;
+
+            // JIT: Aim to finish reload right at r.start, but not before I/O channel is free.
+            let reload_start_time = std::cmp::max(last_rw_end, r.start - total_reload_duration);
+            let mut current_reload_time = reload_start_time;
+
+            for &(addr, size) in &to_load {
+                let reload_duration = size * 40;
+                output.push(format!("Reload {} {} {}", current_reload_time, addr, size));
+                current_reload_time += reload_duration;
+                hbm_regions.push((addr, size));
+            }
+
+            last_rw_end = current_reload_time;
+            merge_regions(&mut hbm_regions);
+        }
+
+        // Schedule Visit
+        let visit_start_time = std::cmp::max(r.start, std::cmp::max(last_visit_end, last_rw_end));
+        output.push(format!("Visit {} {}", visit_start_time, r.id));
+
+        let visit_end_time = visit_start_time + r.time;
+        last_visit_end = visit_end_time;
+
+        // Lock the memory for this new active request
+        active_requests.entry(visit_end_time).or_default().push((r.addr, r.size));
     }
 
-    let fin = std::cmp::max(last_rw_end, last_visit_end);
-    output.push(format!("Fin {}", fin));
+    let fin_time = std::cmp::max(last_rw_end, last_visit_end);
+    output.push(format!("Fin {}", fin_time));
+
     output.join("\n")
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    
+
     if args.len() > 1 && args[1] == "test" {
         tests::run_tests(|input| {
             let data = parse_input(input);
