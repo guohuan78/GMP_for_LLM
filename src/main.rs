@@ -108,13 +108,13 @@ fn merge_regions(regions: &mut Vec<(i64, i64)>) {
         let end = addr + size;
         let last_end = last.0 + last.1;
 
-        if addr <= last_end {
-            // Overlap or adjacent, merge them
+        if addr < last_end {
+            // Overlap (but not just adjacent), merge them
             if end > last_end {
                 last.1 = end - last.0;
             }
         } else {
-            // Disjoint, add new region
+            // Disjoint or adjacent, add new region
             merged.push((addr, size));
         }
     }
@@ -188,7 +188,7 @@ fn solve(data: &Input) -> String {
 
     for (i, r) in data.reqs.iter().enumerate() {
         // --- 1. Update State: Unlock memory from requests that have finished by now ---
-        let current_time = std::cmp::max(last_rw_end, last_visit_end);
+        let current_time = last_rw_end;  // Use RW end time, not max with visit
         active_requests = active_requests.split_off(&current_time);
 
         // --- 2. Analysis Phase: Determine what to load and what to offload ---
@@ -212,7 +212,7 @@ fn solve(data: &Input) -> String {
                             if std::cmp::max(addr, locked_addr)
                                 < std::cmp::min(addr + size, locked_addr + locked_size)
                             {
-                                continue 'region_loop; // This region is locked, skip it
+                                // continue 'region_loop; // This region is locked, skip it  <- REMOVED: Allow locked regions as candidates
                             }
                         }
                     }
@@ -230,8 +230,37 @@ fn solve(data: &Input) -> String {
                         break;
                     }
 
-                    to_offload.push((addr, size));
-                    space_needed_to_free -= size;
+                    // Check if this region overlaps with the current request
+                    let req_end = r.addr + r.size;
+                    let region_end = addr + size;
+                    let overlaps = addr < req_end && region_end > r.addr;
+
+                    if !overlaps {
+                        // No overlap, can offload entire region (or just what we need)
+                        let to_free = std::cmp::min(size, space_needed_to_free);
+                        to_offload.push((addr, to_free));
+                        space_needed_to_free -= to_free;
+                    } else {
+                        // Overlaps, only offload non-overlapping parts
+                        let overlap_start = std::cmp::max(addr, r.addr);
+                        let overlap_end = std::cmp::min(region_end, req_end);
+
+                        // Try to offload left non-overlapping part
+                        if addr < overlap_start {
+                            let left_size = overlap_start - addr;
+                            let to_free = std::cmp::min(left_size, space_needed_to_free);
+                            to_offload.push((addr, to_free));
+                            space_needed_to_free -= to_free;
+                        }
+
+                        // Try to offload right non-overlapping part if still need more space
+                        if space_needed_to_free > 0 && overlap_end < region_end {
+                            let right_size = region_end - overlap_end;
+                            let to_free = std::cmp::min(right_size, space_needed_to_free);
+                            to_offload.push((overlap_end, to_free));
+                            space_needed_to_free -= to_free;
+                        }
+                    }
                 }
             }
         }
@@ -240,7 +269,18 @@ fn solve(data: &Input) -> String {
 
         // Schedule Offloads
         if !to_offload.is_empty() {
-            let offload_start_time = last_rw_end;
+            // Offload must wait for any active Visits on regions being offloaded
+            let mut offload_start_time = last_rw_end;
+            for &(off_addr, off_size) in &to_offload {
+                for (visit_end_time, locked_regions) in &active_requests {
+                    for &(locked_addr, locked_size) in locked_regions {
+                        // Check if this offload region overlaps with a locked region
+                        if std::cmp::max(off_addr, locked_addr) < std::cmp::min(off_addr + off_size, locked_addr + locked_size) {
+                            offload_start_time = std::cmp::max(offload_start_time, *visit_end_time);
+                        }
+                    }
+                }
+            }
             let mut current_offload_time = offload_start_time;
 
             for &(addr, size) in &to_offload {
