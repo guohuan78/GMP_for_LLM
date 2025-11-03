@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::io::{self, BufRead};
 
 mod tests;
+mod extended_tests;
 
 // --- Data Structures ---
 
@@ -334,11 +335,27 @@ fn solve(data: &Input) -> String {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() > 1 && args[1] == "test" {
-        tests::run_tests(|input| {
-            let data = parse_input(input);
-            solve(&data)
-        });
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "test" => {
+                tests::run_tests(|input| {
+                    let data = parse_input(input);
+                    solve(&data)
+                });
+            }
+            "extended" => {
+                extended_tests::run_extended_tests(|input| {
+                    let data = parse_input(input);
+                    solve(&data)
+                });
+            }
+            _ => {
+                println!("用法:");
+                println!("  cargo run          - 标准输入模式");
+                println!("  cargo run test     - 运行README示例测试");
+                println!("  cargo run extended - 运行扩展测试用例集");
+            }
+        }
     } else {
         let data = read_and_parse_input();
         let result = solve(&data);

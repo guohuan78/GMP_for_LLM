@@ -1,0 +1,352 @@
+{
+  "test_cases": [
+    {
+      "id": 1,
+      "name": "简单顺序访问",
+      "description": "两个不重叠的内存区域，顺序访问，无需卸载",
+      "input": {
+        "L": 200,
+        "M": 200,
+        "N": 2,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 0,
+            "time": 50
+          },
+          {
+            "addr": 100,
+            "size": 100,
+            "start": 5000,
+            "time": 30
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 8030,
+      "explanation": "HBM足够大，无需卸载。第二个Reload可以在第一个Visit期间并行执行。"
+    },
+    {
+      "id": 2,
+      "name": "内存复用",
+      "description": "同一内存区域被多次访问，测试内存复用",
+      "input": {
+        "L": 100,
+        "M": 100,
+        "N": 3,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 50,
+            "start": 0,
+            "time": 20
+          },
+          {
+            "addr": 50,
+            "size": 50,
+            "start": 3000,
+            "time": 20
+          },
+          {
+            "addr": 0,
+            "size": 50,
+            "start": 7000,
+            "time": 20
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 7020,
+      "explanation": "第三个请求复用第一个请求的内存，无需重新加载。"
+    },
+    {
+      "id": 3,
+      "name": "Bélády算法测试",
+      "description": "需要根据未来使用情况选择卸载候选",
+      "input": {
+        "L": 300,
+        "M": 100,
+        "N": 4,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 50,
+            "start": 0,
+            "time": 10
+          },
+          {
+            "addr": 50,
+            "size": 50,
+            "start": 3000,
+            "time": 10
+          },
+          {
+            "addr": 100,
+            "size": 100,
+            "start": 7000,
+            "time": 10
+          },
+          {
+            "addr": 0,
+            "size": 50,
+            "start": 11000,
+            "time": 10
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 16030,
+      "explanation": "卸载[50,100)而不是[0,50)，因为[0,50)在未来还会使用。"
+    },
+    {
+      "id": 4,
+      "name": "部分重叠",
+      "description": "内存区域部分重叠，测试精确的内存管理",
+      "input": {
+        "L": 200,
+        "M": 100,
+        "N": 3,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 80,
+            "start": 0,
+            "time": 20
+          },
+          {
+            "addr": 60,
+            "size": 60,
+            "start": 4000,
+            "time": 20
+          },
+          {
+            "addr": 100,
+            "size": 50,
+            "start": 8000,
+            "time": 20
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 9240,
+      "explanation": "第二个请求与第一个重叠[60,80)，只需加载[80,120)。"
+    },
+    {
+      "id": 5,
+      "name": "密集并发访问",
+      "description": "多个请求时间接近，测试活跃锁定机制",
+      "input": {
+        "L": 300,
+        "M": 150,
+        "N": 3,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 0,
+            "time": 100
+          },
+          {
+            "addr": 100,
+            "size": 100,
+            "start": 10,
+            "time": 100
+          },
+          {
+            "addr": 200,
+            "size": 100,
+            "start": 20,
+            "time": 100
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 14200,
+      "explanation": "第三个请求需要在第二个请求Visit结束后才能卸载部分第一个请求的内存。"
+    },
+    {
+      "id": 6,
+      "name": "完全重叠",
+      "description": "后续请求完全包含在前一个请求中",
+      "input": {
+        "L": 200,
+        "M": 100,
+        "N": 3,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 0,
+            "time": 50
+          },
+          {
+            "addr": 20,
+            "size": 30,
+            "start": 5000,
+            "time": 20
+          },
+          {
+            "addr": 40,
+            "size": 20,
+            "start": 9000,
+            "time": 10
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 9010,
+      "explanation": "所有请求都在[0,100)范围内，无需额外加载或卸载。"
+    },
+    {
+      "id": 7,
+      "name": "最小容量压力",
+      "description": "HBM容量刚好够用，频繁卸载加载",
+      "input": {
+        "L": 400,
+        "M": 100,
+        "N": 4,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 0,
+            "time": 20
+          },
+          {
+            "addr": 100,
+            "size": 100,
+            "start": 3000,
+            "time": 20
+          },
+          {
+            "addr": 200,
+            "size": 100,
+            "start": 7000,
+            "time": 20
+          },
+          {
+            "addr": 300,
+            "size": 100,
+            "start": 11000,
+            "time": 20
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 28080,
+      "explanation": "每次都需要完全卸载旧数据才能加载新数据。"
+    },
+    {
+      "id": 8,
+      "name": "零时延启动",
+      "description": "所有请求start时间相同，测试并发处理",
+      "input": {
+        "L": 300,
+        "M": 200,
+        "N": 3,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 0,
+            "time": 30
+          },
+          {
+            "addr": 100,
+            "size": 100,
+            "start": 0,
+            "time": 40
+          },
+          {
+            "addr": 200,
+            "size": 100,
+            "start": 0,
+            "time": 50
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 16090,
+      "explanation": "前两个请求可以预加载，第三个需要等待空间释放。"
+    },
+    {
+      "id": 9,
+      "name": "碎片化内存",
+      "description": "多个小内存块，测试合并逻辑",
+      "input": {
+        "L": 200,
+        "M": 100,
+        "N": 5,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 20,
+            "start": 0,
+            "time": 10
+          },
+          {
+            "addr": 30,
+            "size": 20,
+            "start": 1000,
+            "time": 10
+          },
+          {
+            "addr": 60,
+            "size": 20,
+            "start": 2000,
+            "time": 10
+          },
+          {
+            "addr": 90,
+            "size": 20,
+            "start": 3000,
+            "time": 10
+          },
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 5000,
+            "time": 20
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 5020,
+      "explanation": "最后一个请求需要填充中间的空隙。"
+    },
+    {
+      "id": 10,
+      "name": "长时延访问",
+      "description": "访问时间很长，测试并行优化",
+      "input": {
+        "L": 200,
+        "M": 150,
+        "N": 3,
+        "requests": [
+          {
+            "addr": 0,
+            "size": 100,
+            "start": 0,
+            "time": 200
+          },
+          {
+            "addr": 50,
+            "size": 100,
+            "start": 5000,
+            "time": 200
+          },
+          {
+            "addr": 100,
+            "size": 100,
+            "start": 10000,
+            "time": 200
+          }
+        ]
+      },
+      "expected_output": [],
+      "expected_fin": 10200,
+      "explanation": "第二个请求加载可以在第一个Visit期间完成，第三个无需额外加载。"
+    }
+  ]
+}
