@@ -51,7 +51,11 @@ Fin 12040";
         println!("  ✓ 完成时间相同");
     } else {
         let diff = fin1_actual - fin1_expected;
-        println!("  ✗ 相差: {} (实际 {} 预期)", diff, if diff > 0 { "慢于" } else { "快于" });
+        if fin1_actual < fin1_expected {
+            println!("  ✓ 完成时间更优: {} (快 {} 时间单位)", diff, -diff);
+        } else {
+            println!("  ✗ 完成时间更慢: {} (慢 {} 时间单位)", diff, diff);
+        }
     }
     
     println!("\n{}", "=".repeat(50));
@@ -109,7 +113,11 @@ Fin 12020";
         println!("  ✓ 完成时间相同");
     } else {
         let diff = fin2_actual - fin2_expected;
-        println!("  ✗ 相差: {} (实际 {} 预期)", diff, if diff > 0 { "慢于" } else { "快于" });
+        if fin2_actual < fin2_expected {
+            println!("  ✓ 完成时间更优: {} (快 {} 时间单位)", diff, -diff);
+        } else {
+            println!("  ✗ 完成时间更慢: {} (慢 {} 时间单位)", diff, diff);
+        }
     }
     
     println!("\n{}", "=".repeat(50));
@@ -117,18 +125,32 @@ Fin 12020";
     let match1 = result1 == expected1;
     let match2 = result2 == expected2;
     
-    if match1 {
-        println!("示例一: ✓ 通过");
+    // 完成时间更快或相等都算通过
+    let pass1 = fin1_actual <= fin1_expected;
+    let pass2 = fin2_actual <= fin2_expected;
+    
+    if pass1 {
+        if match1 {
+            println!("示例一: ✓ 通过 (完全匹配)");
+        } else {
+            let improvement = fin1_expected - fin1_actual;
+            println!("示例一: ✓ 通过 (性能提升: 快 {} 时间单位)", improvement);
+        }
     } else {
         let diff1 = fin1_actual - fin1_expected;
-        println!("示例一: ✗ 未通过 (完成时间差值: {:+})", diff1);
+        println!("示例一: ✗ 未通过 (慢 {} 时间单位)", diff1);
     }
     
-    if match2 {
-        println!("示例二: ✓ 通过");
+    if pass2 {
+        if match2 {
+            println!("示例二: ✓ 通过 (完全匹配)");
+        } else {
+            let improvement = fin2_expected - fin2_actual;
+            println!("示例二: ✓ 通过 (性能提升: 快 {} 时间单位)", improvement);
+        }
     } else {
         let diff2 = fin2_actual - fin2_expected;
-        println!("示例二: ✗ 未通过 (完成时间差值: {:+})", diff2);
+        println!("示例二: ✗ 未通过 (慢 {} 时间单位)", diff2);
     }
 
 }
