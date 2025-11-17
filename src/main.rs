@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::env;
-use std::io::{self, Read};
+use std::io;
 
 #[derive(Debug, Clone)]
 struct Req { addr: i64, size: i64, start: i64, time: i64, id: usize }
@@ -214,11 +214,36 @@ fn main() {
             let exp_fin = exp.lines().last().and_then(|l| l.strip_prefix("Fin ")).and_then(|s| s.parse::<i64>().ok()).unwrap_or(-1);
             let act_fin = actual.lines().last().and_then(|l| l.strip_prefix("Fin ")).and_then(|s| s.parse::<i64>().ok()).unwrap_or(-1);
             println!("完成时间: 预期={}, 实际={}\n", exp_fin, act_fin);
+            println!("完成时间: 预期={}, 实际={}\n", exp_fin, act_fin);
         }
         return;
     }
-    let mut buf = String::new();
-    io::stdin().read_to_string(&mut buf).unwrap();
+    
+    // 按行读取输入，读完 N 行后停止
+    use std::io::BufRead;
+    let stdin = io::stdin();
+    let mut reader = stdin.lock();
+    let mut lines = Vec::new();
+    
+    // 读取第一行
+    let mut first_line = String::new();
+    reader.read_line(&mut first_line).unwrap();
+    let first_line = first_line.trim().to_string();
+    
+    // 解析 N
+    let parts: Vec<&str> = first_line.split_whitespace().collect();
+    let n: usize = parts[2].parse().unwrap();
+    
+    lines.push(first_line);
+    
+    // 读取 N 行请求
+    for _ in 0..n {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        lines.push(line.trim().to_string());
+    }
+    
+    let buf = lines.join("\n");
     let out = solve(&buf);
     println!("{}", out);
 }
