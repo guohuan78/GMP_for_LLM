@@ -1,0 +1,6 @@
+Reload 0 0 100
+Visit 4000 0
+Offload 4030 0 100
+Reload 8030 100 100
+Visit 12030 1
+Fin 12040

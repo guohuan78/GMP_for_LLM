@@ -31,5 +31,7 @@ cargo run
 cargo run test
 从infile.txt读取，输出到outfile.txt：
 cargo run < infile.txt > outfile.txt
+运行checker:
+./checker/checker infile.txt outfile.txt outfile.txt
 ```
 
