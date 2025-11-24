@@ -198,8 +198,8 @@ fn main() {
              "Reload 0 0 100\nVisit 4000 0\nOffload 4030 0 100\nReload 8030 100 100\nVisit 12030 1\nFin 12040"),
             ("300 200 3\n0 100 0 50\n100 100 4000 30\n150 100 4001 20\n",
              "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 100\nVisit 8000 1\nOffload 8000 0 50\nReload 10000 200 50\nVisit 12000 2\nFin 12020"),
-            ("300 200 3\n0 100 0 5000\n100 100 0 9000\n50 100 4001 20\n",
-             "Reload 0 100 100\nVisit 4000 1\nReload 4000 0 100\nVisit 8000 0\nVisit 13000 2\nFin 13020"),
+            ("300 200 3\n0 100 0 5000\n100 100 0 5000\n50 100 4001 20\n",
+             "Reload 0 100 100\nReload 4000 0 100\nVisit 8000 1\nVisit 8000 0\nVisit 13000 2\nFin 13020"),
         ];
         for (idx,(inp,exp)) in examples.iter().enumerate() {
             println!("=== 测试示例{} ===", idx+1);
