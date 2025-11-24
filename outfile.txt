@@ -1,6 +1,6 @@
 Reload 0 100 100
-Visit 4000 1
 Reload 4000 0 100
+Visit 8000 1
 Visit 8000 0
 Visit 13000 2
 Fin 13020
