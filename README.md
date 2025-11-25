@@ -53,6 +53,8 @@ rustc 1.91.0 (f8297e351 2025-10-28)
 cargo run
 示例评测：
 cargo run test
+额外测试：
+cargo run test-json
 从infile.txt读取，输出到outfile.txt：
 cargo run < infile.txt > outfile.txt
 运行checker:
