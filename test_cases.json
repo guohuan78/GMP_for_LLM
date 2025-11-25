@@ -111,13 +111,20 @@
       "input": "900 320 7\n0 120 0 3000\n120 100 0 3000\n240 120 2000 2000\n60 180 4000 4000\n300 150 6000 2000\n100 150 8000 2000\n500 200 10000 2000",
       "expected_output": "Reload 0 120 100\nReload 4000 0 120\nVisit 8800 1\nVisit 8800 0\nOffload 11800 0 20\nReload 12600 240 120\nVisit 17400 2\nOffload 19400 20 20\nReload 20200 220 20\nVisit 21000 3\nOffload 25000 40 90\nReload 28600 360 90\nVisit 32200 4\nOffload 34200 250 30\nReload 35400 100 30\nVisit 36600 5\nOffload 38600 100 150\nOffload 44600 280 50\nReload 46600 500 200\nVisit 54600 6\nFin 56600",
       "expected_fin": 56600
+    },
+    {
+      "name": "波前测试1 - 局部切片卸载",
+      "description": "先加载大区间，随后同一时间窗内的请求仅需其中一部分并额外申请新区域，通过波前调度的 carve 能释放不重叠部分从而保持合法",
+      "input": "500 200 3\n0 200 0 4000\n100 100 5000 2000\n250 100 5000 2000",
+      "expected_output": "Reload 0 0 200\nVisit 8000 0\nOffload 12000 0 100\nReload 16000 250 100\nVisit 20000 1\nVisit 20000 2\nFin 22000",
+      "expected_fin": 22000
     }
   ],
   "metadata": {
     "version": "1.0",
     "created": "2025-11-24",
     "description": "GMP for LLM 测试用例集",
-    "total_cases": 16,
+    "total_cases": 17,
     "categories": {
       "基础测试": 3,
       "压力测试": 2,
@@ -127,7 +134,8 @@
       "Bélády测试": 2,
       "并行测试": 2,
       "活跃保护测试": 3,
-      "极限测试": 2
+      "极限测试": 2,
+      "波前测试": 1
     }
   }
 }
