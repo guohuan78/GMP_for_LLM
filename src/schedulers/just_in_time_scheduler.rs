@@ -109,7 +109,7 @@ impl JustInTimeScheduler {
              // JIT 核心：取 Deadline 和 总线空闲时间 的较大值
              // 这意味着如果总线早就空闲了，我们也不急着加载，而是等到 Deadline 再开始
              // 从而让数据在 HBM 里的“等待上场时间”为 0。
-             let jit_start = std::cmp::max(deadline, *last_rw_end);
+             let _jit_start = std::cmp::max(deadline, *last_rw_end);
              
              // 当然，也不能违背 last_visit_end (CPU 忙碌时可能无法发出指令，视硬件而定，这里保守起见取 max)
              // 题目设定：读写操作和访存操作可以并行。所以理论上 Reload 可以在 Visit 期间进行。
@@ -166,7 +166,7 @@ impl Scheduler for JustInTimeScheduler {
             i = j;
         }
 
-        for (g_idx, group_indices) in groups.iter().enumerate() {
+        for (_g_idx, group_indices) in groups.iter().enumerate() {
             active_requests = active_requests.split_off(&last_rw_end);
             let mut group_visit_end = last_visit_end;
             

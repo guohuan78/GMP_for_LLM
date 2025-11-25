@@ -195,7 +195,7 @@ impl Scheduler for GenerationalScheduler {
             i = j;
         }
 
-        for (g_idx, group_indices) in groups.iter().enumerate() {
+        for (_g_idx, group_indices) in groups.iter().enumerate() {
             active_requests = active_requests.split_off(&last_rw_end);
             let mut group_visit_end = last_visit_end;
             
