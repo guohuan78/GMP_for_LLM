@@ -22,7 +22,7 @@ void check_input()
     input.L = inf.readInt(1, 100000, "L");
     input.M = inf.readInt(1, input.L, "M");
     input.N = inf.readInt(1, 10000, "N");
-    int last_start = 0;
+    int last_start = -1;
     int N = input.N, L = input.L;
     for (int i = 0; i < N; i++) {
         int addr = inf.readInt(0, L - 1, "addr_i");
@@ -31,6 +31,10 @@ void check_input()
         int tim = inf.readInt(0, 1e9, "time_i");
         quitif(addr + size > L, _fail, "[Invalid Input] addr + size > L, where addr = %d, size = %d, L = %d", addr, size, L);
         quitif(start < last_start, _fail, "[Invalid Input] start[%d] > start[%d] (%d > %d)", i - 1, i, last_start, start);
+        if (start == last_start) {
+            quitif(input.ops[i - 1].tim != tim, _fail, "[Invalid Input] start[%d] == start[%d] but time[%d] != time[%d]",
+                i - 1, i, i - 1, i);
+        }
         last_start = start;
         input.ops.push_back({addr, size, start, tim});
     }
@@ -133,8 +137,9 @@ uint64_t get_score()
         } else if (curr.opName == "Visit") {
             uint64_t this_task_finish_time = curr.T + input.ops[curr.A].tim;
             if (last_visit != -1 && input.ops[last_visit].start == input.ops[curr.A].start) {
-                // PASS. The same task.
-                npu_time = std::max(npu_time, this_task_finish_time);
+                // The same task.
+                quitif(this_task_finish_time != npu_time, _wa, "[Invalid Output] Visit %d and Visit %d must start at the same time. Op[%d] = (%s %llu %d)",
+                    last_visit, curr.A, i, curr.opName.c_str(), curr.T, curr.A);
             } else {
                 quitif(npu_time > curr.T, _wa, "[Invalid Output] NPU is busy. Last NPU task finish at %llu. Op[%d] = (%s %llu %d)",
                     npu_time, i, curr.opName.c_str(), curr.T, curr.A);
