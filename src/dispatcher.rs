@@ -6,7 +6,7 @@ use std::process::Command;
 use std::path::Path;
 use crate::scheduler_trait::{Scheduler, ScheduleResult, ResultSelector, SelectionStrategy};
 use crate::types::parse_input;
-use crate::schedulers::{AggressivePrefetchScheduler, BaseScheduler, GreedyScheduler, LazyScheduler, LruScheduler, OverlapAwareEvictionScheduler, SlidingWindowGreedyScheduler, WavefrontScheduler};
+use crate::schedulers::{AggressivePrefetchScheduler, BaseScheduler, GreedyScheduler, LazyScheduler, LruScheduler, OverlapAwareEvictionScheduler, SlidingWindowGreedyScheduler, CostBenefitScheduler, LfuScheduler, WavefrontScheduler};
 
 /// 调度器注册表
 pub struct SchedulerRegistry {
