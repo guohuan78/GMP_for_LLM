@@ -4,121 +4,141 @@
       "name": "基础测试1 - 简单顺序",
       "description": "两个请求顺序执行，需要offload",
       "input": "200 100 2\n0 100 0 30\n100 100 50 10",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nOffload 4030 0 100\nReload 8030 100 100\nVisit 12030 1\nFin 12040"
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nOffload 4030 0 100\nReload 8030 100 100\nVisit 12030 1\nFin 12040",
+      "expected_fin": 12040
     },
     {
       "name": "基础测试2 - 三请求混合",
       "description": "三个请求，包含offload和不同时间开始",
       "input": "300 200 3\n0 100 0 50\n100 100 4000 30\n150 100 4001 20",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 100\nVisit 8000 1\nOffload 8000 0 50\nReload 10000 200 50\nVisit 12000 2\nFin 12020"
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 100\nVisit 8000 1\nOffload 8000 0 50\nReload 10000 200 50\nVisit 12000 2\nFin 12020",
+      "expected_fin": 12020
     },
     {
       "name": "基础测试3 - 同时开始",
       "description": "两个请求同时开始，需要同时Visit",
       "input": "300 200 3\n0 100 0 5000\n100 100 0 5000\n50 100 4001 20",
-      "expected_output": "Reload 0 100 100\nReload 4000 0 100\nVisit 8000 1\nVisit 8000 0\nVisit 13000 2\nFin 13020"
+      "expected_output": "Reload 0 100 100\nReload 4000 0 100\nVisit 8000 1\nVisit 8000 0\nVisit 13000 2\nFin 13020",
+      "expected_fin": 13020
     },
     {
       "name": "压力测试1 - 多个同时请求",
       "description": "5个请求同时开始，测试组级别处理",
       "input": "500 300 5\n0 50 0 1000\n50 50 0 1500\n100 50 0 2000\n150 50 0 1200\n200 50 0 800",
-      "expected_output": "Reload 0 0 50\nReload 2000 50 50\nReload 4000 100 50\nReload 6000 150 50\nReload 8000 200 50\nVisit 10000 4\nVisit 10000 3\nVisit 10000 2\nVisit 10000 1\nVisit 10000 0\nFin 12000"
+      "expected_output": "Reload 0 0 50\nReload 2000 50 50\nReload 4000 100 50\nReload 6000 150 50\nReload 8000 200 50\nVisit 10000 4\nVisit 10000 3\nVisit 10000 2\nVisit 10000 1\nVisit 10000 0\nFin 12000",
+      "expected_fin": 12000
     },
     {
       "name": "压力测试2 - HBM容量不足",
       "description": "请求总量超过HBM容量，需要频繁offload",
       "input": "1000 200 4\n0 150 0 100\n200 150 500 100\n400 150 1000 100\n600 150 1500 100",
-      "expected_output": "Reload 0 0 150\nVisit 6000 0\nOffload 6100 0 150\nReload 6100 200 150\nVisit 12100 1\nOffload 12200 200 150\nReload 12200 400 150\nVisit 18200 2\nOffload 18300 400 150\nReload 18300 600 150\nVisit 24300 3\nFin 24400"
+      "expected_output": "Reload 0 0 150\nVisit 6000 0\nOffload 6100 0 150\nReload 6100 200 150\nVisit 12100 1\nOffload 12200 200 150\nReload 12200 400 150\nVisit 18200 2\nOffload 18300 400 150\nReload 18300 600 150\nVisit 24300 3\nFin 24400",
+      "expected_fin": 24400
     },
     {
       "name": "边界测试1 - 恰好装满HBM",
       "description": "多个请求恰好装满HBM，无需offload",
       "input": "300 200 4\n0 50 0 100\n50 50 500 100\n100 50 1000 100\n150 50 1500 100",
-      "expected_output": "Reload 0 0 50\nVisit 2000 0\nReload 2000 50 50\nVisit 4000 1\nReload 4000 100 50\nVisit 6000 2\nReload 6000 150 50\nVisit 8000 3\nFin 8100"
+      "expected_output": "Reload 0 0 50\nVisit 2000 0\nReload 2000 50 50\nVisit 4000 1\nReload 4000 100 50\nVisit 6000 2\nReload 6000 150 50\nVisit 8000 3\nFin 8100",
+      "expected_fin": 8100
     },
     {
       "name": "边界测试2 - 单个请求占满HBM",
       "description": "单个请求大小等于HBM容量",
       "input": "500 200 2\n0 200 0 1000\n300 100 5000 500",
-      "expected_output": "Reload 0 0 200\nVisit 8000 0\nOffload 9000 0 200\nReload 9000 300 100\nVisit 13000 1\nFin 13500"
+      "expected_output": "Reload 0 0 200\nVisit 8000 0\nOffload 9000 0 200\nReload 9000 300 100\nVisit 13000 1\nFin 13500",
+      "expected_fin": 13500
     },
     {
       "name": "复杂测试1 - 重叠内存区域",
       "description": "多个请求的内存区域部分重叠",
       "input": "400 300 4\n0 100 0 200\n50 100 1000 200\n75 50 2000 100\n100 100 3000 200",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 50\nVisit 6000 1\nReload 6000 125 25\nVisit 7000 2\nReload 7000 150 50\nVisit 9000 3\nFin 9200"
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 50\nVisit 6000 1\nReload 6000 125 25\nVisit 7000 2\nReload 7000 150 50\nVisit 9000 3\nFin 9200",
+      "expected_fin": 9200
     },
     {
       "name": "复杂测试2 - 提前Reload优化",
       "description": "测试提前Reload机制，避免阻塞Visit",
       "input": "500 300 3\n0 100 10000 5000\n100 100 12000 3000\n200 100 15000 2000",
-      "expected_output": "Reload 6000 0 100\nVisit 10000 0\nReload 8000 100 100\nVisit 12000 1\nReload 13000 200 100\nVisit 15000 2\nFin 17000"
+      "expected_output": "Reload 6000 0 100\nVisit 10000 0\nReload 8000 100 100\nVisit 12000 1\nReload 13000 200 100\nVisit 15000 2\nFin 17000",
+      "expected_fin": 17000
     },
     {
       "name": "复杂测试3 - 多组同时请求",
       "description": "多个时间点都有同时开始的请求",
       "input": "600 400 6\n0 100 0 1000\n100 100 0 1500\n200 100 5000 800\n300 100 5000 1200\n400 100 10000 500\n500 100 10000 600",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nReload 8000 200 100\nReload 9000 300 100\nVisit 13000 3\nVisit 13000 2\nReload 13000 400 100\nReload 15000 500 100\nVisit 20000 5\nVisit 20000 4\nFin 20600"
+      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nReload 8000 200 100\nReload 9000 300 100\nVisit 13000 3\nVisit 13000 2\nReload 13000 400 100\nReload 15000 500 100\nVisit 20000 5\nVisit 20000 4\nFin 20600",
+      "expected_fin": 20600
     },
     {
       "name": "时间测试1 - 极早开始时间",
       "description": "请求开始时间为0，测试最早Reload时机",
       "input": "300 200 3\n0 100 0 100\n100 100 0 150\n200 100 0 200",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nOffload 8100 0 100\nReload 8100 200 100\nVisit 12100 2\nFin 12300"
+      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nOffload 8100 0 100\nReload 8100 200 100\nVisit 12100 2\nFin 12300",
+      "expected_fin": 12300
     },
     {
       "name": "时间测试2 - 大间隔时间",
       "description": "请求之间有很大时间间隔",
       "input": "500 300 3\n0 100 0 1000\n200 100 100000 1000\n400 100 200000 1000",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nOffload 5000 0 100\nReload 96000 200 100\nVisit 100000 1\nOffload 101000 200 100\nReload 196000 400 100\nVisit 200000 2\nFin 201000"
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nOffload 5000 0 100\nReload 96000 200 100\nVisit 100000 1\nOffload 101000 200 100\nReload 196000 400 100\nVisit 200000 2\nFin 201000",
+      "expected_fin": 201000
     },
     {
       "name": "Bélády测试1 - 最优替换策略",
       "description": "测试基于未来使用的最优替换算法",
       "input": "300 150 4\n0 100 0 100\n100 100 500 100\n0 100 1000 100\n200 100 1500 100",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 100\nVisit 8000 1\nOffload 8100 100 100\nVisit 12100 2\nReload 12100 200 100\nVisit 16100 3\nFin 16200"
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 100\nVisit 8000 1\nOffload 8100 100 100\nVisit 12100 2\nReload 12100 200 100\nVisit 16100 3\nFin 16200",
+      "expected_fin": 16200
     },
     {
       "name": "Bélády测试2 - 复杂替换决策",
       "description": "多次需要决策offload哪个内存块",
       "input": "500 200 5\n0 80 0 100\n100 80 500 100\n200 80 1000 100\n0 80 1500 100\n300 80 2000 100",
-      "expected_output": "Reload 0 0 80\nVisit 3200 0\nReload 3200 100 80\nVisit 6400 1\nOffload 6500 0 80\nReload 6500 200 80\nVisit 9700 2\nVisit 12900 3\nOffload 13000 100 80\nReload 13000 300 80\nVisit 16200 4\nFin 16300"
+      "expected_output": "Reload 0 0 80\nVisit 3200 0\nReload 3200 100 80\nVisit 6400 1\nOffload 6500 0 80\nReload 6500 200 80\nVisit 9700 2\nVisit 12900 3\nOffload 13000 100 80\nReload 13000 300 80\nVisit 16200 4\nFin 16300",
+      "expected_fin": 16300
     },
     {
       "name": "并行测试1 - 读写并行",
       "description": "测试Reload和Visit可以并行（Visit不早于start）",
       "input": "400 300 3\n0 100 10000 2000\n100 100 11000 1000\n200 100 12000 500",
-      "expected_output": "Reload 6000 0 100\nVisit 10000 0\nReload 7000 100 100\nVisit 11000 1\nReload 8000 200 100\nVisit 12000 2\nFin 12500"
+      "expected_output": "Reload 6000 0 100\nVisit 10000 0\nReload 7000 100 100\nVisit 11000 1\nReload 8000 200 100\nVisit 12000 2\nFin 12500",
+      "expected_fin": 12500
     },
     {
       "name": "并行测试2 - 多Visit并行",
       "description": "多个同时开始的Visit可以同时执行",
       "input": "400 300 4\n0 100 1000 500\n100 100 1000 800\n200 100 1000 300\n300 100 5000 400",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nVisit 12000 2\nVisit 12000 1\nVisit 12000 0\nOffload 12300 200 100\nReload 12300 300 100\nVisit 17300 3\nFin 17700"
+      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nVisit 12000 2\nVisit 12000 1\nVisit 12000 0\nOffload 12300 200 100\nReload 12300 300 100\nVisit 17300 3\nFin 17700",
+      "expected_fin": 17700
     },
     {
       "name": "活跃保护测试1 - 正在访问的内存不能offload",
       "description": "测试active_requests保护机制",
       "input": "400 200 3\n0 150 0 10000\n200 100 5000 100\n350 100 8000 100",
-      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 100\nVisit 10000 1\nOffload 16000 200 100\nReload 16000 350 100\nVisit 20000 2\nFin 20100"
+      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 100\nVisit 10000 1\nOffload 16000 200 100\nReload 16000 350 100\nVisit 20000 2\nFin 20100",
+      "expected_fin": 20100
     },
     {
       "name": "活跃保护测试2 - 复杂保护场景",
       "description": "多个长时间Visit，测试保护和等待机制",
       "input": "500 250 4\n0 150 0 20000\n200 150 10000 15000\n400 150 18000 5000\n600 100 22000 1000",
-      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 150\nVisit 16000 1\nOffload 26000 0 150\nReload 26000 400 150\nVisit 32000 2\nOffload 37000 200 150\nReload 37000 600 100\nVisit 41000 3\nFin 42000"
+      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 150\nVisit 16000 1\nOffload 26000 0 150\nReload 26000 400 150\nVisit 32000 2\nOffload 37000 200 150\nReload 37000 600 100\nVisit 41000 3\nFin 42000",
+      "expected_fin": 42000
     },
     {
       "name": "极限测试1 - 大量小请求",
       "description": "10个小请求顺序执行",
       "input": "1000 500 10\n0 50 0 100\n50 50 500 100\n100 50 1000 100\n150 50 1500 100\n200 50 2000 100\n250 50 2500 100\n300 50 3000 100\n350 50 3500 100\n400 50 4000 100\n450 50 4500 100",
-      "expected_output": "Reload 0 0 50\nVisit 2000 0\nReload 2000 50 50\nVisit 4000 1\nReload 4000 100 50\nVisit 6000 2\nReload 6000 150 50\nVisit 8000 3\nReload 8000 200 50\nVisit 10000 4\nReload 10000 250 50\nVisit 12000 5\nReload 12000 300 50\nVisit 14000 6\nReload 14000 350 50\nVisit 16000 7\nReload 16000 400 50\nVisit 18000 8\nReload 18000 450 50\nVisit 20000 9\nFin 20100"
+      "expected_output": "Reload 0 0 50\nVisit 2000 0\nReload 2000 50 50\nVisit 4000 1\nReload 4000 100 50\nVisit 6000 2\nReload 6000 150 50\nVisit 8000 3\nReload 8000 200 50\nVisit 10000 4\nReload 10000 250 50\nVisit 12000 5\nReload 12000 300 50\nVisit 14000 6\nReload 14000 350 50\nVisit 16000 7\nReload 16000 400 50\nVisit 18000 8\nReload 18000 450 50\nVisit 20000 9\nFin 20100",
+      "expected_fin": 20100
     },
     {
       "name": "极限测试2 - 8个同时开始",
       "description": "8个请求同时开始，测试大规模组处理",
       "input": "800 600 8\n0 100 0 1000\n100 100 0 1200\n200 100 0 800\n300 100 0 1500\n400 100 0 900\n500 100 0 1100\n600 100 0 700\n700 100 0 1300",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nReload 12000 300 100\nReload 16000 400 100\nReload 20000 500 100\nVisit 24000 7\nVisit 24000 6\nVisit 24000 5\nVisit 24000 4\nVisit 24000 3\nVisit 24000 2\nVisit 24000 1\nVisit 24000 0\nFin 25500"
+      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nReload 12000 300 100\nReload 16000 400 100\nReload 20000 500 100\nVisit 24000 7\nVisit 24000 6\nVisit 24000 5\nVisit 24000 4\nVisit 24000 3\nVisit 24000 2\nVisit 24000 1\nVisit 24000 0\nFin 25500",
+      "expected_fin": 25500
     }
   ],
   "metadata": {
