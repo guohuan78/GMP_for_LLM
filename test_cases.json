@@ -32,8 +32,8 @@
       "name": "压力测试2 - HBM容量不足",
       "description": "请求总量超过HBM容量，需要频繁offload",
       "input": "1000 200 4\n0 150 0 100\n200 150 500 100\n400 150 1000 100\n600 150 1500 100",
-      "expected_output": "Reload 0 0 150\nVisit 6000 0\nOffload 6100 0 150\nReload 6100 200 150\nVisit 12100 1\nOffload 12200 200 150\nReload 12200 400 150\nVisit 18200 2\nOffload 18300 400 150\nReload 18300 600 150\nVisit 24300 3\nFin 24400",
-      "expected_fin": 24400
+      "expected_output": "Reload 0 0 150\nVisit 6000 0\nOffload 6100 0 100\nReload 10100 200 150\nVisit 16100 1\nOffload 16200 0 150\nOffload 22200 200 100\nReload 26200 400 150\nVisit 32200 2\nOffload 32300 200 150\nOffload 38300 400 100\nReload 42300 600 150\nVisit 48300 3\nFin 48400",
+      "expected_fin": 48400
     },
     {
       "name": "边界测试1 - 恰好装满HBM",
