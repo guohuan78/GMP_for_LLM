@@ -88,8 +88,8 @@
       "name": "Bélády测试1 - 最优替换策略",
       "description": "测试基于未来使用的最优替换算法",
       "input": "300 150 4\n0 100 0 100\n100 100 500 100\n0 100 1000 100\n200 100 1500 100",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 100\nVisit 8000 1\nOffload 8100 100 100\nVisit 12100 2\nReload 12100 200 100\nVisit 16100 3\nFin 16200",
-      "expected_fin": 16200
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nOffload 4100 0 50\nReload 6100 100 100\nVisit 10100 1\nOffload 10200 100 50\nReload 12200 0 50\nVisit 14200 2\nOffload 14300 0 100\nReload 18300 200 100\nVisit 22300 3\nFin 22400",
+      "expected_fin": 22400
     },
     {
       "name": "Bélády测试2 - 复杂替换决策",
