@@ -71,16 +71,10 @@ impl Scheduler for LazyScheduler {
                         
                         if !still_needed && hbm.contains(&(ea, es)) {
                             // 立即释放（延迟策略核心特征）
-                            // 注意：必须在 last_rw_end 之后才能进行 IO 操作
-                            let start_t = last_rw_end.max(req.start);
-                            output.push(format!("Offload {} {} {}", start_t, ea, es));
-                            last_rw_end = start_t + es;
+                            output.push(format!("Offload {} {} {}", last_rw_end, ea, es));
+                            last_rw_end += es;
                             hbm.retain(|&r| r != (ea, es));
                             eager_offload_count += 1;
-                            
-                            if verbose {
-                                eprintln!("[Lazy] T={} 立即释放过期数据 [{}, {})", start_t, ea, ea + es);
-                            }
                         }
                     }
                 }
@@ -118,9 +112,8 @@ impl Scheduler for LazyScheduler {
                             break;
                         }
                         
-                        let start_t = last_rw_end.max(req.start);
-                        output.push(format!("Offload {} {} {}", start_t, ha, hs));
-                        last_rw_end = start_t + hs;
+                        output.push(format!("Offload {} {} {}", last_rw_end, ha, hs));
+                        last_rw_end += hs;
                         freed += hs;
                         offload_count += 1;
                         
@@ -136,8 +129,7 @@ impl Scheduler for LazyScheduler {
                 }
                 
                 // 加载数据
-                let start_t = last_rw_end.max(req.start);
-                let mut t = start_t;
+                let mut t = last_rw_end.max(req.start);
                 for (a, s) in missing {
                     output.push(format!("Reload {} {} {}", t, a, s));
                     t += s;
@@ -176,8 +168,8 @@ impl Scheduler for LazyScheduler {
         
         if verbose {
             eprintln!(
-                "[Lazy] 完成：Reload={}, Offload={}（含 {} 次即时释放）, Fin={}",
-                reload_count, offload_count + eager_offload_count, eager_offload_count, fin_time
+                "[Lazy] 完成：Reload={}, Offload={}, Fin={}",
+                reload_count, offload_count + eager_offload_count, fin_time
             );
         }
         
