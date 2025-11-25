@@ -5,7 +5,7 @@
 **队员**：包子旭、沈铭
 **学校**：西北工业大学
 **指导老师**：张羽教授  
-**日期**：2025年11月
+**日期**：2025年11月25日
 
 ---
 
@@ -98,9 +98,7 @@
 - **验证层**：Checker 确保所有输出合法性
 │(FIFO)│  │ Window   │  │     │  │Benefit│ │Aware │
 └──────┘  └──────────┘  └─────┘  └──────┘  └──────┘
-```
 
----
 
 ## 2. 问题分析
 
@@ -182,8 +180,6 @@ if is_visiting(region) {
     skip_offload(region);
 }
 ```
-
----
 
 ## 3. 算法设计理念
 
@@ -1442,24 +1438,8 @@ CPU: x86_64
 
 ```bash
 cargo run test
-Time: ~1.5 seconds for 3 test cases (含10个调度器 + Checker)
+Time: ~0.5 seconds for 3 test cases (含14个调度器 + Checker)
 ```
-
-**瓶颈分析**（估算）：
-
-| 函数                  | 占比 |
-| --------------------- | ---- |
-| find_next_use         | 40%  |
-| find_missing_segments | 20%  |
-| merge_regions         | 10%  |
-| Checker 验证          | 15%  |
-| 其他                  | 15%  |
-
-**优化建议**：
-
-1. 缓存 `find_next_use` 结果
-2. 使用更高效的区间数据结构（如 Interval Tree）
-3. 并行运行不同调度器（Rayon）
 
 ---
 
@@ -1566,7 +1546,7 @@ if checker_enabled {
 
 4. **性能表现**：
    - 官方3个示例均达到最优结果
-   - 执行时间 < 2 秒
+   - 执行时间 < 0.5 秒
    - 内存占用 < 50 MB
 
 ### 10.2 优势分析
@@ -1642,13 +1622,6 @@ let results: Vec<_> = schedulers.par_iter()
    - 支持动态请求（streaming）
    - 实时调整策略
 
-3. **GPU 加速**：
-   - 利用 CUDA/OpenCL 加速 find_next_use
-   - 并行处理多个请求
-
-4. **分布式调度**：
-   - 支持多节点协作
-   - 大规模 LLM 训练场景
 
 ### 10.5 实际应用展望
 
@@ -1676,7 +1649,6 @@ let results: Vec<_> = schedulers.par_iter()
 
 **核心创新点**：
 
-- ✅ 组级别 Visit 对齐机制
 - ✅ 多策略自动选择框架
 - ✅ 部分卸载优化
 - ✅ 完善的活跃锁定
@@ -1756,8 +1728,6 @@ serde_json = "1.0"
 操作系统：Ubuntu 24.04.2 LTS（推荐）或其他 Linux 发行版
 编译器：rustc 1.91.0+
 构建工具：cargo 1.91.0+
-内存：至少 1GB RAM
-磁盘：至少 100MB 空间
 ```
 
 ### E. 联系方式
