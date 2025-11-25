@@ -6,7 +6,7 @@ use std::process::Command;
 use std::path::Path;
 use crate::scheduler_trait::{Scheduler, ScheduleResult, ResultSelector, SelectionStrategy};
 use crate::types::parse_input;
-use crate::schedulers::{GreedyScheduler, BaseScheduler, LruScheduler, AggressivePrefetchScheduler, LazyScheduler};
+use crate::schedulers::{GreedyScheduler, BaseScheduler, LruScheduler, AggressivePrefetchScheduler, LazyScheduler, WavefrontScheduler};
 
 /// 调度器注册表
 pub struct SchedulerRegistry {
@@ -21,6 +21,7 @@ impl SchedulerRegistry {
         // 注册调度器（按优先级顺序）
         // 添加新调度器：只需在此处 push 即可
         schedulers.push(Box::new(GreedyScheduler::new()));
+        schedulers.push(Box::new(WavefrontScheduler::new()));
         schedulers.push(Box::new(LruScheduler::new()));
         schedulers.push(Box::new(AggressivePrefetchScheduler::new()));
         schedulers.push(Box::new(LazyScheduler::new()));
