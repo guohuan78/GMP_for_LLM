@@ -14,6 +14,8 @@ pub mod wavefront_scheduler;
 pub mod slidingwindowgreedy_scheduler;
 pub mod overlap_aware_eviction_scheduler;
 
+pub mod cost_benefit_scheduler;
+pub mod lfu_scheduler;
 // 重导出，方便使用
 pub use greedy_scheduler::GreedyScheduler;
 pub use base_scheduler::BaseScheduler;
@@ -23,3 +25,5 @@ pub use lazy_scheduler::LazyScheduler;
 pub use wavefront_scheduler::WavefrontScheduler;
 pub use slidingwindowgreedy_scheduler::SlidingWindowGreedyScheduler;
 pub use overlap_aware_eviction_scheduler::OverlapAwareEvictionScheduler;
+pub use cost_benefit_scheduler::CostBenefitScheduler;
+pub use lfu_scheduler::LfuScheduler;

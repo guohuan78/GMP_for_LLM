@@ -28,6 +28,8 @@ impl SchedulerRegistry {
         schedulers.push(Box::new(BaseScheduler::new()));
         schedulers.push(Box::new(SlidingWindowGreedyScheduler::new()));
         schedulers.push(Box::new(OverlapAwareEvictionScheduler::new()));
+        schedulers.push(Box::new(CostBenefitScheduler::new()));
+        schedulers.push(Box::new(LfuScheduler::new()));
         
         Self { schedulers }
     }
