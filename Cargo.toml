@@ -3,6 +3,14 @@ name = "gmp_for_llm"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "gmp_for_llm"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gmp_for_llm"
+path = "src/main.rs"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
