@@ -90,22 +90,43 @@
       "input": "800 800 8\n0 100 0 1500\n100 100 0 1500\n200 100 0 1500\n300 100 0 1500\n400 100 0 1500\n500 100 0 1500\n600 100 0 1500\n700 100 0 1500",
       "expected_output": "Reload 0 700 100\nReload 4000 600 100\nReload 8000 500 100\nReload 12000 400 100\nReload 16000 300 100\nReload 20000 200 100\nReload 24000 100 100\nReload 28000 0 100\nVisit 32000 7\nVisit 32000 6\nVisit 32000 5\nVisit 32000 4\nVisit 32000 3\nVisit 32000 2\nVisit 32000 1\nVisit 32000 0\nFin 33500",
       "expected_fin": 33500
+    },
+    {
+      "name": "复杂测试4 - 多级部分卸载",
+      "description": "同时开始的请求与多轮交错访问，要求多次部分卸载与再加载",
+      "input": "900 350 6\n0 150 0 4000\n150 150 0 4000\n300 150 2000 2000\n450 200 4000 3000\n100 150 7000 2000\n500 200 9000 2000",
+      "expected_output": "Reload 0 150 150\nReload 6000 0 150\nVisit 12000 1\nVisit 12000 0\nOffload 16000 0 100\nReload 20000 300 150\nVisit 26000 2\nOffload 28000 100 200\nReload 36000 450 200\nVisit 44000 3\nOffload 47000 300 150\nReload 53000 100 150\nVisit 59000 4\nOffload 61000 100 50\nReload 63000 650 50\nVisit 65000 5\nFin 67000",
+      "expected_fin": 67000
+    },
+    {
+      "name": "活跃保护测试3 - 连续保护窗口",
+      "description": "长时间任务与短任务交错，必须等待活跃窗口后才能卸载重叠区",
+      "input": "1000 300 6\n0 200 0 2000\n200 150 3000 2000\n100 150 4000 3000\n350 150 6000 2000\n150 200 9000 2000\n500 200 11000 2000",
+      "expected_output": "Reload 0 0 200\nVisit 8000 0\nOffload 10000 0 50\nReload 12000 200 150\nVisit 18000 1\nVisit 20000 2\nOffload 23000 50 150\nReload 29000 350 150\nVisit 35000 3\nOffload 37000 350 50\nReload 39000 150 50\nVisit 41000 4\nOffload 43000 150 200\nReload 51000 500 200\nVisit 59000 5\nFin 61000",
+      "expected_fin": 61000
+    },
+    {
+      "name": "复杂测试5 - 交错保护与再利用",
+      "description": "多阶段交错请求，大量小区间被部分卸载并在不同时间再利用",
+      "input": "900 320 7\n0 120 0 3000\n120 100 0 3000\n240 120 2000 2000\n60 180 4000 4000\n300 150 6000 2000\n100 150 8000 2000\n500 200 10000 2000",
+      "expected_output": "Reload 0 120 100\nReload 4000 0 120\nVisit 8800 1\nVisit 8800 0\nOffload 11800 0 20\nReload 12600 240 120\nVisit 17400 2\nOffload 19400 20 20\nReload 20200 220 20\nVisit 21000 3\nOffload 25000 40 90\nReload 28600 360 90\nVisit 32200 4\nOffload 34200 250 30\nReload 35400 100 30\nVisit 36600 5\nOffload 38600 100 150\nOffload 44600 280 50\nReload 46600 500 200\nVisit 54600 6\nFin 56600",
+      "expected_fin": 56600
     }
   ],
   "metadata": {
     "version": "1.0",
     "created": "2025-11-24",
     "description": "GMP for LLM 测试用例集",
-    "total_cases": 20,
+    "total_cases": 16,
     "categories": {
       "基础测试": 3,
       "压力测试": 2,
       "边界测试": 2,
-      "复杂测试": 3,
+      "复杂测试": 5,
       "时间测试": 2,
       "Bélády测试": 2,
       "并行测试": 2,
-      "活跃保护测试": 2,
+      "活跃保护测试": 3,
       "极限测试": 2
     }
   }
