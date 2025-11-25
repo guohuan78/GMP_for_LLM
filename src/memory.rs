@@ -58,3 +58,27 @@ pub fn find_missing_segments(hbm: &Vec<(i64, i64)>, addr: i64, size: i64) -> Vec
     
     missing
 }
+
+
+/// 从HBM中移除指定区间，允许部分重叠
+pub fn remove_region(regions: &mut Vec<(i64, i64)>, addr: i64, size: i64) {
+    if size <= 0 {
+        return;
+    }
+    let end = addr + size;
+    let mut updated = Vec::new();
+    for &(ra, rs) in regions.iter() {
+        let r_end = ra + rs;
+        if r_end <= addr || ra >= end {
+            updated.push((ra, rs));
+            continue;
+        }
+        if ra < addr {
+            updated.push((ra, addr - ra));
+        }
+        if r_end > end {
+            updated.push((end, r_end - end));
+        }
+    }
+    *regions = updated;
+}

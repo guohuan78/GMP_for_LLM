@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use crate::scheduler_trait::Scheduler;
 use crate::types::Req;
-use crate::memory::{merge_regions, find_missing_segments};
+use crate::memory::{merge_regions, find_missing_segments, remove_region};
 
 pub struct BaseScheduler;
 
@@ -80,7 +80,7 @@ impl Scheduler for BaseScheduler {
                 for &(oa, osz) in &to_offload {
                     output.push(format!("Offload {} {} {}", t, oa, osz));
                     t += osz * 40;
-                    hbm.retain(|&(ha, hs)| !(ha == oa && hs == osz));
+                    remove_region(&mut hbm, oa, osz);
                 }
                 last_rw_end = t;
             }

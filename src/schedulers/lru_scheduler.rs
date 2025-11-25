@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use crate::scheduler_trait::Scheduler;
 use crate::types::Req;
-use crate::memory::{merge_regions, find_missing_segments};
+use crate::memory::{merge_regions, find_missing_segments, remove_region};
 
 pub struct LruScheduler;
 
@@ -110,8 +110,11 @@ impl LruScheduler {
             for &(oa, osz) in &to_offload {
                 output.push(format!("Offload {} {} {}", t, oa, osz));
                 t += osz * 40;
-                hbm.retain(|&(ha, hs)| !(ha == oa && hs == osz));
-                access_time.remove(&(oa, osz));
+                remove_region(hbm, oa, osz);
+                access_time.retain(|&(ha, hs), _| hbm.iter().any(|&(ra, rs)| ra == ha && rs == hs));
+                for &(ha, hs) in hbm.iter() {
+                    access_time.entry((ha, hs)).or_insert(0);
+                }
             }
             *last_rw_end = t;
         }
