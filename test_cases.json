@@ -73,7 +73,7 @@
     {
       "name": "时间测试1 - 极早开始时间",
       "description": "请求开始时间为0，测试最早Reload时机",
-      "input": "300 200 3\n0 100 0 100\n100 100 0 150\n200 100 0 200",
+      "input": "300 300 3\n0 100 0 100\n100 100 0 150\n200 100 0 200",
       "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nOffload 8100 0 100\nReload 8100 200 100\nVisit 12100 2\nFin 12300",
       "expected_fin": 12300
     },
@@ -115,15 +115,15 @@
     {
       "name": "活跃保护测试1 - 正在访问的内存不能offload",
       "description": "测试active_requests保护机制",
-      "input": "400 200 3\n0 150 0 10000\n200 100 5000 100\n350 100 8000 100",
-      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 100\nVisit 10000 1\nOffload 16000 200 100\nReload 16000 350 100\nVisit 20000 2\nFin 20100",
+      "input": "400 200 3\n0 150 0 10000\n200 100 5000 100\n300 100 8000 100",
+      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 100\nVisit 10000 1\nOffload 16000 200 100\nReload 16000 300 100\nVisit 20000 2\nFin 20100",
       "expected_fin": 20100
     },
     {
       "name": "活跃保护测试2 - 复杂保护场景",
       "description": "多个长时间Visit，测试保护和等待机制",
-      "input": "500 250 4\n0 150 0 20000\n200 150 10000 15000\n400 150 18000 5000\n600 100 22000 1000",
-      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 150\nVisit 16000 1\nOffload 26000 0 150\nReload 26000 400 150\nVisit 32000 2\nOffload 37000 200 150\nReload 37000 600 100\nVisit 41000 3\nFin 42000",
+      "input": "500 250 4\n0 150 0 20000\n200 150 10000 15000\n350 150 18000 5000\n400 100 22000 1000",
+      "expected_output": "Reload 0 0 150\nVisit 6000 0\nReload 6000 200 150\nVisit 16000 1\nOffload 26000 0 150\nReload 26000 350 150\nVisit 32000 2\nOffload 37000 200 150\nReload 37000 400 100\nVisit 41000 3\nFin 42000",
       "expected_fin": 42000
     },
     {
@@ -136,7 +136,7 @@
     {
       "name": "极限测试2 - 8个同时开始",
       "description": "8个请求同时开始，测试大规模组处理",
-      "input": "800 600 8\n0 100 0 1000\n100 100 0 1200\n200 100 0 800\n300 100 0 1500\n400 100 0 900\n500 100 0 1100\n600 100 0 700\n700 100 0 1300",
+      "input": "800 800 8\n0 100 0 1000\n100 100 0 1200\n200 100 0 800\n300 100 0 1500\n400 100 0 900\n500 100 0 1100\n600 100 0 700\n700 100 0 1300",
       "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nReload 12000 300 100\nReload 16000 400 100\nReload 20000 500 100\nVisit 24000 7\nVisit 24000 6\nVisit 24000 5\nVisit 24000 4\nVisit 24000 3\nVisit 24000 2\nVisit 24000 1\nVisit 24000 0\nFin 25500",
       "expected_fin": 25500
     }
