@@ -53,8 +53,8 @@
       "name": "复杂测试1 - 重叠内存区域",
       "description": "多个请求的内存区域部分重叠",
       "input": "400 300 4\n0 100 0 200\n50 100 1000 200\n75 50 2000 100\n100 100 3000 200",
-      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4000 100 50\nVisit 6000 1\nReload 6000 125 25\nVisit 7000 2\nReload 7000 150 50\nVisit 9000 3\nFin 9200",
-      "expected_fin": 9200
+      "expected_output": "Reload 0 0 100\nVisit 4000 0\nReload 4200 100 50\nVisit 6200 1\nVisit 6400 2\nReload 6500 150 50\nVisit 8500 3\nFin 8700",
+      "expected_fin": 8700
     },
     {
       "name": "复杂测试2 - 提前Reload优化",
