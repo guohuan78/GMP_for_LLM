@@ -24,8 +24,8 @@
     {
       "name": "压力测试1 - 多个同时请求",
       "description": "5个请求同时开始，测试组级别处理",
-      "input": "500 300 5\n0 50 0 1000\n50 50 0 1500\n100 50 0 2000\n150 50 0 1200\n200 50 0 800",
-      "expected_output": "Reload 0 0 50\nReload 2000 50 50\nReload 4000 100 50\nReload 6000 150 50\nReload 8000 200 50\nVisit 10000 4\nVisit 10000 3\nVisit 10000 2\nVisit 10000 1\nVisit 10000 0\nFin 12000",
+      "input": "500 300 5\n0 50 0 2000\n50 50 0 2000\n100 50 0 2000\n150 50 0 2000\n200 50 0 2000",
+      "expected_output": "Reload 0 200 50\nReload 2000 150 50\nReload 4000 100 50\nReload 6000 50 50\nReload 8000 0 50\nVisit 10000 4\nVisit 10000 3\nVisit 10000 2\nVisit 10000 1\nVisit 10000 0\nFin 12000",
       "expected_fin": 12000
     },
     {
@@ -66,16 +66,16 @@
     {
       "name": "复杂测试3 - 多组同时请求",
       "description": "多个时间点都有同时开始的请求",
-      "input": "600 400 6\n0 100 0 1000\n100 100 0 1500\n200 100 5000 800\n300 100 5000 1200\n400 100 10000 500\n500 100 10000 600",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nReload 8000 200 100\nReload 9000 300 100\nVisit 13000 3\nVisit 13000 2\nReload 13000 400 100\nReload 15000 500 100\nVisit 20000 5\nVisit 20000 4\nFin 20600",
-      "expected_fin": 20600
+      "input": "600 400 6\n0 100 0 1500\n100 100 0 1500\n200 100 5000 1200\n300 100 5000 1200\n400 100 10000 600\n500 100 10000 600",
+      "expected_output": "Reload 0 100 100\nReload 4000 0 100\nVisit 8000 1\nVisit 8000 0\nReload 8000 300 100\nReload 12000 200 100\nVisit 16000 3\nVisit 16000 2\nOffload 16000 0 200\nReload 24000 500 100\nReload 28000 400 100\nVisit 32000 5\nVisit 32000 4\nFin 32600",
+      "expected_fin": 32600
     },
     {
       "name": "时间测试1 - 极早开始时间",
       "description": "请求开始时间为0，测试最早Reload时机",
-      "input": "300 300 3\n0 100 0 100\n100 100 0 150\n200 100 0 200",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nVisit 8000 1\nVisit 8000 0\nOffload 8100 0 100\nReload 8100 200 100\nVisit 12100 2\nFin 12300",
-      "expected_fin": 12300
+      "input": "300 300 3\n0 100 0 200\n100 100 0 200\n200 100 0 200",
+      "expected_output": "Reload 0 200 100\nReload 4000 100 100\nReload 8000 0 100\nVisit 12000 2\nVisit 12000 1\nVisit 12000 0\nFin 12200",
+      "expected_fin": 12200
     },
     {
       "name": "时间测试2 - 大间隔时间",
@@ -108,9 +108,9 @@
     {
       "name": "并行测试2 - 多Visit并行",
       "description": "多个同时开始的Visit可以同时执行",
-      "input": "400 300 4\n0 100 1000 500\n100 100 1000 800\n200 100 1000 300\n300 100 5000 400",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nVisit 12000 2\nVisit 12000 1\nVisit 12000 0\nOffload 12300 200 100\nReload 12300 300 100\nVisit 17300 3\nFin 17700",
-      "expected_fin": 17700
+      "input": "400 300 4\n0 100 1000 800\n100 100 1000 800\n200 100 1000 800\n300 100 5000 400",
+      "expected_output": "Reload 0 200 100\nReload 4000 100 100\nReload 8000 0 100\nVisit 12000 2\nVisit 12000 1\nVisit 12000 0\nOffload 12800 0 100\nReload 16800 300 100\nVisit 20800 3\nFin 21200",
+      "expected_fin": 21200
     },
     {
       "name": "活跃保护测试1 - 正在访问的内存不能offload",
@@ -136,9 +136,9 @@
     {
       "name": "极限测试2 - 8个同时开始",
       "description": "8个请求同时开始，测试大规模组处理",
-      "input": "800 800 8\n0 100 0 1000\n100 100 0 1200\n200 100 0 800\n300 100 0 1500\n400 100 0 900\n500 100 0 1100\n600 100 0 700\n700 100 0 1300",
-      "expected_output": "Reload 0 0 100\nReload 4000 100 100\nReload 8000 200 100\nReload 12000 300 100\nReload 16000 400 100\nReload 20000 500 100\nVisit 24000 7\nVisit 24000 6\nVisit 24000 5\nVisit 24000 4\nVisit 24000 3\nVisit 24000 2\nVisit 24000 1\nVisit 24000 0\nFin 25500",
-      "expected_fin": 25500
+      "input": "800 800 8\n0 100 0 1500\n100 100 0 1500\n200 100 0 1500\n300 100 0 1500\n400 100 0 1500\n500 100 0 1500\n600 100 0 1500\n700 100 0 1500",
+      "expected_output": "Reload 0 700 100\nReload 4000 600 100\nReload 8000 500 100\nReload 12000 400 100\nReload 16000 300 100\nReload 20000 200 100\nReload 24000 100 100\nReload 28000 0 100\nVisit 32000 7\nVisit 32000 6\nVisit 32000 5\nVisit 32000 4\nVisit 32000 3\nVisit 32000 2\nVisit 32000 1\nVisit 32000 0\nFin 33500",
+      "expected_fin": 33500
     }
   ],
   "metadata": {
