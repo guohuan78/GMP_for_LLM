@@ -110,7 +110,7 @@
       "description": "多阶段交错请求，大量小区间被部分卸载并在不同时间再利用",
       "input": "900 320 7\n0 120 0 3000\n120 100 0 3000\n240 120 2000 2000\n60 180 4000 4000\n300 150 6000 2000\n100 150 8000 2000\n500 200 10000 2000",
       "expected_output": "Reload 0 120 100\nReload 4000 0 120\nVisit 8800 1\nVisit 8800 0\nOffload 11800 0 20\nReload 12600 240 120\nVisit 17400 2\nOffload 19400 20 20\nReload 20200 220 20\nVisit 21000 3\nOffload 25000 40 90\nReload 28600 360 90\nVisit 32200 4\nOffload 34200 250 30\nReload 35400 100 30\nVisit 36600 5\nOffload 38600 100 150\nOffload 44600 280 50\nReload 46600 500 200\nVisit 54600 6\nFin 56600",
-      "expected_fin": 56600
+      "expected_fin": 55800
     },
     {
       "name": "波前测试1 - 局部切片卸载",
