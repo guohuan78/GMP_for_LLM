@@ -107,7 +107,7 @@ impl GreedyScheduler {
 
         // 执行offload
         if !to_offload.is_empty() {
-            let mut start_t = *last_rw_end;
+            let mut start_t = std::cmp::max(*last_rw_end, *last_visit_end);
             for &(oa, osz) in &to_offload {
                 for (&visit_end, locked) in active_requests.iter() {
                     for &(la, lsz) in locked {
@@ -130,7 +130,7 @@ impl GreedyScheduler {
         if !all_loads.is_empty() {
             let group_req_start = reqs[group_indices[0]].start;
             let total_reload = total_load_size * 40;
-            let reload_start = std::cmp::max(*last_rw_end, group_req_start - total_reload);
+            let reload_start = std::cmp::max(std::cmp::max(*last_rw_end, *last_visit_end), group_req_start - total_reload);
             let mut t = reload_start;
 
             for (_, loads) in &all_loads {
@@ -228,7 +228,7 @@ impl GreedyScheduler {
             }
 
             if !to_offload.is_empty() {
-                let mut start_t = *last_rw_end;
+                let mut start_t = std::cmp::max(*last_rw_end, *last_visit_end);
                 for &(oa, osz) in &to_offload {
                     for (&visit_end, locked) in active_requests.iter() {
                         for &(la, lsz) in locked {
@@ -249,7 +249,7 @@ impl GreedyScheduler {
 
             if !to_load.is_empty() {
                 let total_reload = total_load * 40;
-                let reload_start = std::cmp::max(*last_rw_end, r.start - total_reload);
+                let reload_start = std::cmp::max(std::cmp::max(*last_rw_end, *last_visit_end), r.start - total_reload);
                 let mut t = reload_start;
                 for &(la, lsz) in &to_load {
                     output.push(format!("Reload {} {} {}", t, la, lsz));
