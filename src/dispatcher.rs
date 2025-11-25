@@ -6,7 +6,7 @@ use std::process::Command;
 use std::path::Path;
 use crate::scheduler_trait::{Scheduler, ScheduleResult, ResultSelector, SelectionStrategy};
 use crate::types::parse_input;
-use crate::schedulers::{AggressivePrefetchScheduler, BaseScheduler, GreedyScheduler, LazyScheduler, LruScheduler, OverlapAwareEvictionScheduler, SlidingWindowGreedyScheduler, CostBenefitScheduler, LfuScheduler, WavefrontScheduler};
+use crate::schedulers::{AggressivePrefetchScheduler, BaseScheduler, GreedyScheduler, LazyScheduler, LruScheduler, OverlapAwareEvictionScheduler, SlidingWindowGreedyScheduler, CostBenefitScheduler, LfuScheduler, WavefrontScheduler, AdaptiveScheduler, FragmentationScheduler, JustInTimeScheduler, GenerationalScheduler};
 
 /// 调度器注册表
 pub struct SchedulerRegistry {
@@ -30,6 +30,10 @@ impl SchedulerRegistry {
         schedulers.push(Box::new(OverlapAwareEvictionScheduler::new()));
         schedulers.push(Box::new(CostBenefitScheduler::new()));
         schedulers.push(Box::new(LfuScheduler::new()));
+        schedulers.push(Box::new(AdaptiveScheduler::new()));
+        schedulers.push(Box::new(FragmentationScheduler::new()));
+        schedulers.push(Box::new(JustInTimeScheduler::new()));
+        schedulers.push(Box::new(GenerationalScheduler::new()));
         
         Self { schedulers }
     }

@@ -16,6 +16,11 @@ pub mod overlap_aware_eviction_scheduler;
 
 pub mod cost_benefit_scheduler;
 pub mod lfu_scheduler;
+pub mod adaptive_scheduler;
+pub mod fragmentation_scheduler;
+pub mod just_in_time_scheduler;
+pub mod generational_scheduler;
+
 // 重导出，方便使用
 pub use greedy_scheduler::GreedyScheduler;
 pub use base_scheduler::BaseScheduler;
@@ -27,3 +32,7 @@ pub use slidingwindowgreedy_scheduler::SlidingWindowGreedyScheduler;
 pub use overlap_aware_eviction_scheduler::OverlapAwareEvictionScheduler;
 pub use cost_benefit_scheduler::CostBenefitScheduler;
 pub use lfu_scheduler::LfuScheduler;
+pub use adaptive_scheduler::AdaptiveScheduler;
+pub use fragmentation_scheduler::FragmentationScheduler;
+pub use just_in_time_scheduler::JustInTimeScheduler;
+pub use generational_scheduler::GenerationalScheduler;
