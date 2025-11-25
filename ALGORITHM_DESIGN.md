@@ -1,7 +1,9 @@
 # GMP_for_LLM 算法设计文档
 
 **项目名称**：大模型训推全局内存规划（Global Memory Planning for LLM）  
-**团队**：西北工业大学 - 郭睆、包子旭、沈铭  
+**队长**：郭睆
+**队员**：包子旭、沈铭
+**学校**：西北工业大学
 **指导老师**：张羽教授  
 **日期**：2025年11月
 
@@ -38,7 +40,7 @@
 
 本方案的核心技术特点包括：
 
-1. **多策略调度框架**：实现了10种不同的调度策略，自动选择最优结果
+1. **多策略调度框架**：实现了14种不同的调度策略，自动选择最优结果
 2. **预测式页面替换**：基于 Bélády 算法的未来访问预测
 3. **活跃锁定机制**：保护正在使用的内存区域
 4. **部分卸载优化**：精确控制卸载粒度
@@ -49,27 +51,51 @@
 ### 1.4 系统架构
 
 ```
-┌─────────────────────────────────────────────┐
-│           Dispatcher (调度器选择器)          │
-│  - 管理多个调度策略                          │
-│  - 选择 BestFinTime 策略                    │
-│  - Checker 验证                             │
-└─────────────────┬───────────────────────────┘
-                  │
-    ┌─────────────┴─────────────┐
-    │   Scheduler Trait         │
-    │   - name()                │
-    │   - schedule()            │
-    └─────────────┬─────────────┘
-                  │
-    ┌─────────────┴──────────────────────────────────┐
-    │                                                 │
-┌───▼────┐  ┌────────┐  ┌─────┐  ┌────────┐  ┌─────┐
-│ Greedy │  │Wavefront│ │ LRU │  │Aggressive│ │ Lazy│
-│(Bélády)│  │ (波前)  │  │     │  │Prefetch  │ │     │
-└────────┘  └────────┘  └─────┘  └────────┘  └─────┘
-┌──────┐  ┌──────────┐  ┌─────┐  ┌──────┐  ┌──────┐
-│ Base │  │ Sliding  │  │ LFU │  │ Cost │  │Overlap│
+┌──────────────────────────────────────────────────────────────┐
+│               Dispatcher (调度器选择器)                       │
+│  - 管理14个调度策略    - 选择 BestFinTime    - Checker验证   │
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │     Scheduler Trait         │
+              │  - name()   - schedule()    │
+              └──────────────┬──────────────┘
+                             │
+        ┌────────────────────┴────────────────────────┐
+        │                                             │
+┌───────▼───────┐  ┌─────────┐  ┌─────┐  ┌──────────┐  ┌──────┐
+│    Greedy     │  │Wavefront│  │ LRU │  │Aggressive│  │ Lazy │
+│   (Bélády)    │  │ (波前)   │  │     │  │ Prefetch │  │      │
+│   主力算法     │  │时域分块  │  │历史  │  │ 激进预取  │  │保守  │
+└───────────────┘  └─────────┘  └─────┘  └──────────┘  └──────┘
+
+┌──────┐  ┌──────────┐  ┌─────┐  ┌──────┐  ┌────────┐  ┌──────┐
+│ Base │  │ Sliding  │  │ LFU │  │ Cost │  │Overlap │  │Adapt │
+│(FIFO)│  │ Window   │  │频率 │  │Benefit│ │ Aware  │  │自适应│
+│基线  │  │滑动窗口   │  │导向 │  │成本比 │  │重叠感知 │  │组合  │
+└──────┘  └──────────┘  └─────┘  └──────┘  └────────┘  └──────┘
+
+┌──────────┐  ┌─────────┐  ┌────────────┐
+│Fragment  │  │   JIT   │  │Generational│
+│碎片优化   │  │准时加载  │  │  分代缓存   │
+│          │  │         │  │  (SLRU)    │
+└──────────┘  └─────────┘  └────────────┘
+
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │   Checker 验证工具     │
+        │ - 格式检查  - 约束验证 │
+        │ - 时间依赖  - 内存限制 │
+        └───────────────────────┘
+```
+
+**架构说明**：
+
+- **第一层（经典算法）**：Greedy、Wavefront、LRU、AggressivePrefetch、Lazy - 核心策略
+- **第二层（优化策略）**：Base、SlidingWindow、LFU、CostBenefit、OverlapAware、Adaptive - 场景优化
+- **第三层（高级策略）**：Fragmentation、JIT、Generational - 专门优化
+- **验证层**：Checker 确保所有输出合法性
 │(FIFO)│  │ Window   │  │     │  │Benefit│ │Aware │
 └──────┘  └──────────┘  └─────┘  └──────┘  └──────┘
 ```
@@ -163,7 +189,7 @@ if is_visiting(region) {
 
 ### 3.1 多策略调度框架
 
-本项目采用**多策略并行尝试**的设计思路，实现了10种调度算法：
+本项目采用**多策略并行尝试**的设计思路，实现了14种调度算法：
 
 | 调度器                            | 核心思想           | 适用场景           |
 | --------------------------------- | ------------------ | ------------------ |
@@ -177,7 +203,10 @@ if is_visiting(region) {
 | **OverlapAwareEvictionScheduler** | 重叠感知卸载       | 高重叠度场景       |
 | **CostBenefitScheduler**          | 成本收益分析       | 复杂权衡场景       |
 | **LfuScheduler**                  | 最不常用优先       | 热点数据场景       |
-
+| **JustInTimeScheduler**           | 准时制加载         | 内存极度紧张场景   |
+| **AdaptiveScheduler**             | 自适应策略组合     | 动态负载场景       |
+| **FragmentationScheduler**        | 碎片化优化         | 高碎片风险场景     |
+| **GenerationalScheduler**         | 分代缓存（SLRU）   | 一次性扫描数据混合 |
 **Dispatcher 选择逻辑**：
 
 ```rust
@@ -726,14 +755,90 @@ for &req_idx in group_indices {
 
 1. 所有同组请求的 Visit 时间戳相同
 2. 持续时间满足所有请求（取max）
-3. 符合 Checker 的严格要求
+### 5.5 已实现调度算法总览
 
-### 5.5 其他调度策略简介
+本节基于当前 `src/schedulers` 下的实现，对已经注册到 `Dispatcher` 的 14 个调度算法做集中说明。
 
-#### WavefrontScheduler（时域波前调度）
+**调度器注册位置**（节选自 `src/dispatcher.rs`）：
 
 ```rust
-// 核心思想：按时间波次分批处理
+let mut schedulers: Vec<Box<dyn Scheduler>> = Vec::new();
+
+// 注册调度器（按优先级顺序）
+schedulers.push(Box::new(GreedyScheduler::new()));
+schedulers.push(Box::new(WavefrontScheduler::new()));
+schedulers.push(Box::new(LruScheduler::new()));
+schedulers.push(Box::new(AggressivePrefetchScheduler::new()));
+schedulers.push(Box::new(LazyScheduler::new()));
+schedulers.push(Box::new(BaseScheduler::new()));
+schedulers.push(Box::new(SlidingWindowGreedyScheduler::new()));
+schedulers.push(Box::new(OverlapAwareEvictionScheduler::new()));
+schedulers.push(Box::new(CostBenefitScheduler::new()));
+schedulers.push(Box::new(LfuScheduler::new()));
+schedulers.push(Box::new(AdaptiveScheduler::new()));
+schedulers.push(Box::new(FragmentationScheduler::new()));
+schedulers.push(Box::new(JustInTimeScheduler::new()));
+schedulers.push(Box::new(GenerationalScheduler::new()));
+```
+
+**统一接口**：
+
+```rust
+pub trait Scheduler: Send + Sync {
+    fn name(&self) -> &str;
+    fn schedule(
+        &self,
+        reqs: &Vec<Req>,
+        l: i64,
+        m: i64,
+    ) -> Result<String, String>;
+}
+```
+
+---
+
+#### 1. GreedyScheduler（Bélády 型主力算法）
+
+**类型：** 主力 / 近似最优  
+**文件：** `src/schedulers/greedy_scheduler.rs`
+
+**设计目标：**
+
+核心依据是离线最优页面置换的思想（Bélády）：在需要腾出空间时，优先卸载"未来最晚被使用"的数据。针对本赛题的访问模型（有 `start` / `time`、任务分组、IO 串行等约束）进行了适配与扩展。
+
+**核心数据结构：**
+
+- `Vec<Req>`：所有请求（含 `addr`, `size`, `start`, `time`, `id`）
+- `hbm: Vec<(i64, i64)>`：当前 HBM 中的区间列表（起始地址 + 长度）
+- `active_requests: BTreeMap<i64, Vec<(i64, i64)>>`：按"访问结束时间"索引的活跃访问区间
+- `last_rw_end: i64`：最近一次 Reload / Offload 结束时间
+- `last_visit_end: i64`：最近一次 Visit 结束时间
+
+**核心流程：**
+
+1. **预处理：** 按输入顺序（`start` 非减）对请求分组，`start` 相同的请求视为同一任务的若干访问
+2. **每组处理：** 先用 `find_missing_segments(&hbm, addr, size)` 找出当前不在 HBM 中的子区间
+3. **腾挪策略（Bélády）：** 对 HBM 中的每个区间调用 `find_next_use` 查找下次被访问时间，优先卸载"下次使用时间最晚 / 不再使用"的区间
+4. **Reload 策略：** 对 `missing` 集合进行合并后统一 Reload
+5. **Visit 策略：** 同一任务内所有请求的 Visit 必须同时开始，持续时间为该组任务的 `time`
+
+**特点：** 通过"未来最晚使用"预测实现近似最优决策，在官方样例和多数复杂测试中几乎总是给出最优或接近最优的 `Fin`。
+
+---
+
+#### 2. WavefrontScheduler（时域波前策略）
+
+**类型：** 时域分块 / 波前推进  
+**目标：** 把整个时间轴划分为若干"波前 wave"，在每个 wave 内局部求解。
+
+**设计思路：**
+
+将请求按时间划成若干段（wave），以 wave 为基本单位进行调度：在进入某个 wave 之前，先确保 wave 中所有请求所需数据在 wave 内的某个时间点可被 Reload 完成；在 wave 中尽量安排 Visit 和必要的 Offload。
+
+**实现要点：**
+
+```rust
+// 按时间波次分批处理
 fn divide_into_waves(reqs: &Vec<Req>, wave_threshold: i64) -> Vec<Vec<usize>> {
     let mut waves = Vec::new();
     let mut current_wave = Vec::new();
@@ -749,21 +854,64 @@ fn divide_into_waves(reqs: &Vec<Req>, wave_threshold: i64) -> Vec<Vec<usize>> {
         }
         current_wave.push(i);
     }
-    
     waves
 }
 ```
 
-#### LruScheduler（最近最少使用）
+**使用场景：** 适合时间维度上分层明显的访问模式；算法结构清晰，便于调试和分析时间–空间演化。
+
+---
+
+#### 3. LruScheduler（LRU：最近最少使用）
+
+**类型：** 历史启发（Least Recently Used）
+
+**设计思路：**
+
+维护每个 HBM 区间最近一次被访问的时间戳；当需要释放空间时，优先卸载**最近最长时间没被访问**的区间。与 Bélády 不同，不预测未来，只利用历史访问信息。
+
+**实现细节：**
 
 ```rust
-// 核心思想：维护访问历史，优先卸载最久未用的
+// 维护访问历史，优先卸载最久未用的
 struct LruTracker {
     access_time: BTreeMap<(i64, i64), i64>,  // (addr, size) -> last_access_time
 }
 ```
 
-#### LazyScheduler（延迟保守策略）
+每次 Visit 时，遍历其访问区间，并更新对应区间"最近访问时间"；当空间不足时，计算每个候选区间的 `last_access_time`，从最早访问的开始依次 Offload。
+
+**特点：** 实现相对简单；对某些局部时间局部访问的模式效果良好。
+
+---
+
+#### 4. AggressivePrefetchScheduler（激进预取策略）
+
+**类型：** 激进预取 / 宽带宽场景倾向
+
+**设计目标：**
+
+利用 IO 总线空闲时间，尽可能早地将**未来将要访问的数据**提前载入 HBM；牺牲一部分空间利用率，换取访问时更少的等待。
+
+**核心策略：**
+
+- **必要的 Reload：** 确保当前组访问所需数据在 Visit 前完成
+- **预取策略：** 如果 HBM 还有显著空闲空间，预先加载下一个任务组中即将访问的区间
+- **Offload：** 更为谨慎，只在确实需要空间时才进行释放
+
+**典型行为：** 在 Greedy 的基础骨架上增添"下一个 Group 的提前加载"逻辑；更容易在"计算时间长 / 总线充裕 / 数据复用度高"的场景中缩短整体 `Fin`。
+
+---
+
+#### 5. LazyScheduler（延迟/保守策略）
+
+**类型：** 按需加载 + 及时释放 / 内存敏感型
+
+**设计目标：**
+
+内存极其紧张时，避免任何"多余的预取"；尽量保持 HBM 空闲，让关键任务一来就有空间。
+
+**行为特点：**
 
 ```rust
 // 核心思想：Visit结束后立即释放内存
@@ -771,8 +919,238 @@ struct LruTracker {
 // 劣势：可能增加IO次数
 ```
 
+- **加载策略：** 每次调度只针对当前请求真正缺失的区间进行 Reload
+- **释放策略：** 维护 `active_requests` 集合，对已经不被任何活跃请求的区间，尽快 Offload
+- **时间控制：** 所有 Offload/Reload 的时间统一用 `last_rw_end` 递进，保证 IO 严格串行
+
+**适用场景：** HBM 容量非常紧张；访问序列跨度大、复用度不高的情况。
+
 ---
 
+#### 6. BaseScheduler（基线/占位策略）
+
+**类型：** 简单基线 / 验证框架用
+
+**设计思路：**
+
+做最少的"聪明事"，以便验证整个框架（解析 / 输出 / checker 调用）是否正确，与复杂策略比较展示优化的收益。
+
+**实现特征：**
+
+- 按请求顺序逐个处理
+- 仅当内存不足时才释放一些"最早装入"的区间（类似 FIFO）
+- 不做复杂预取、不太考虑协调多个任务的时间关系
+
+**用途：** 基线对照；方便在竞赛答辩中展示"从朴素到优化"的收益曲线。
+
+---
+
+#### 7. SlidingWindowGreedyScheduler（滑动窗口贪心）
+
+**类型：** 局部时间窗口优化
+
+**设计目标：**
+
+将时间轴划分为若干滑动窗口，在每个窗口内独立做近似优化；试图在保证算法复杂度可控的同时，捕捉中短期内的访问相关性。
+
+**典型策略：**
+
+对某个窗口 `[T, T+W)` 内的请求，统计其对各区间的访问，在窗口内使用简化的"Bélády + LRU"混合规则进行 Reload/Offload 决策。
+
+---
+
+#### 8. OverlapAwareEvictionScheduler（重叠感知淘汰）
+
+**类型：** 地址区间重叠特化
+
+**设计动机：**
+
+在大模型权重/激活等访问中，不同请求的地址区间常常有**重叠部分**；盲目按整个区间粒度进行 Offload，可能会错误地释放那些"高复用的重叠段"。
+
+**核心思路：**
+
+细化区间粒度，对 `[addr, addr+size)` 进行拆分/合并，区分"当前请求独享区间"和"多请求共享区间"；Offload 时优先释放"独享且近期不再使用"的部分；对共享重叠区间更加谨慎，以降低后续 Reload 代价。
+
+---
+
+#### 9. CostBenefitScheduler（收益/成本比评估）
+
+**类型：** 简单启发式评分
+
+**思路：**
+
+为每个候选区间计算一个"单位空间带来的预期收益"：`benefit ≈ 未来访问次数 / 当前大小`，或结合访问间隔、时间窗口等；在需要释放空间时，优先放弃"收益/成本比最低"的区间。
+
+**特点：**
+
+引入了更高层次的"经济学思维"：空间有限，谁应该先走？依赖于对未来访问的静态分析或近似统计，可在一些重复访问集中于少数区域的场景中表现良好。
+
+---
+
+#### 10. LfuScheduler（LFU：最不常使用）
+
+**类型：** 访问频率导向（Least Frequently Used）
+
+**策略：**
+
+统计每个区间在**历史上被访问的次数**；当需要释放空间时，优先 Offload"历史访问次数最少"的区间。
+
+**与 LRU 的差异：**
+
+- LRU 看"最近一次时间"，LFU 看"累计次数"
+- LRU 更关注时间局部性，LFU 更关注"热点/冷点"长期模式
+
+---
+
+#### 11. AdaptiveScheduler（自适应调度器）
+
+**类型：** 策略组合 / 动态调整
+
+**目标：**
+
+不依赖单一启发式，在运行过程中根据观测情况做简易的策略切换或混合。
+
+**可能行为：**
+
+- 当观测到 OOM 风险频繁发生时，更偏向 Lazy / Fragmentation 风格
+- 当发现数据复用度很高时，更偏向 AggressivePrefetch / Greedy 风格
+- 通过少量"开关"参数，在不同场景之间做折中
+
+---
+
+#### 12. FragmentationScheduler（碎片化友好策略）
+
+**类型：** 针对碎片问题的专门优化
+
+**问题背景：**
+
+频繁的局部 Reload/Offload 容易导致 HBM 区间高度碎片化；碎片化会在后续需要大块连续空间时造成困难（即使总空闲足够）。
+
+**策略要点：**
+
+- 在决定 Offload 时，引入一个"碎片贡献度"度量：尽量优先合并/释放那些会造成/缓解碎片的区间
+- 合理利用 `merge_regions`，积极将零散小块合并为连续大块
+- 对内存操作序列进行轻度重排，减小碎片负担
+
+---
+
+#### 13. JustInTimeScheduler（JIT：准时加载）
+
+**类型：** 近死线加载（Just-in-time）
+
+**设计理念：**
+
+尽量在"刚好要用到前"才进行 Reload，从而减少长时间占用 HBM 的无效驻留；为前面任务腾出更多空间，降低冲突。
+
+**实现思路：**
+
+```rust
+// 计算 Reload 开始时间
+let total_reload_time = total_load * 40;  // 加载时间
+let deadline = r.start;  // 必须在此之前完成
+let reload_start = std::cmp::max(
+    *last_rw_end,              // RW 串行约束
+    deadline - total_reload_time  // 恰好在 Visit 前完成
+);
+```
+
+对每个请求（或任务组）计算一个"最晚可开始 Reload 的时间"，确保在 Visit 前完成：`reload_latest_start = visit_start - reload_cost`；以 `last_rw_end` 为基线，尽量贴近"最后时刻"再触发 Reload。
+
+**适用场景：** 内存极度紧张（Memory Bound），但总线带宽相对充裕（Bandwidth Loose）的场景。
+
+**优势分析：**
+
+1. **最小化内存占用时间**：数据只在需要时才加载
+2. **降低内存峰值**：避免过早加载导致的内存积压
+3. **提高内存利用率**：为其他任务预留更多空间
+
+---
+
+#### 14. GenerationalScheduler（分代策略）
+
+**类型：** 数据"世代"区分（类似 GC 分代思想）
+
+**直观解释：**
+
+将数据/区间按照其"访问生命周期"划分为若干代：短命代（只在短时间窗口内访问一两次）和长寿代（在很长时间内被多次访问）。不同代采用不同的驻留/淘汰策略。
+
+**核心思想：**
+
+将内存划分为"考察区（Probation）"和"保护区（Protected）"，只有被访问至少两次的数据才能进入保护区。
+
+**理论基础：**
+
+基于 SLRU（Segmented LRU）算法，防止"一次性扫描"数据污染热点缓存。
+
+**实现策略：**
+
+```rust
+struct GenerationalScheduler {
+    protected_set: HashSet<i64>,      // 保护区地址集合
+    hit_count: BTreeMap<i64, u32>,    // 记录击中次数
+}
+
+// 晋升策略
+for &idx in group_indices {
+    let r = &reqs[idx];
+    let count = hit_count.entry(r.addr).or_insert(0);
+    *count += 1;
+    
+    // 访问两次以上进入保护区
+    if *count >= 2 {
+        protected_set.insert(r.addr);
+    }
+}
+
+// 淘汰策略：优先淘汰考察区数据
+let is_protected = protected_set.contains(&region_addr);
+if !is_protected {
+    // 考察区数据，优先淘汰
+    to_offload.push((addr, size));
+} else {
+    // 保护区数据，使用 Bélády 算法
+    let next_use = find_next_use(addr, size, current_idx, reqs);
+    candidates.push((next_use, addr, size));
+}
+```
+
+**策略例子：**
+
+- 对短命数据更激进地 Offload，避免长时间占用
+- 对长寿热数据更倾向于长期驻留，减少频繁 Reload
+- 利用访问历史构建"代龄"信息，动态调整
+
+**适用场景：** 存在大量一次性数据流，但也包含少量高频热点数据的混合负载。
+
+**优势分析：**
+
+1. **防止缓存污染**：一次性扫描数据不会挤出热点数据
+2. **保护热点数据**：多次访问的数据获得更高优先级
+3. **自适应学习**：根据访问模式动态调整保护策略
+
+**对比分析：**
+
+| 场景           | LRU策略    | Generational策略 |
+| -------------- | ---------- | ---------------- |
+| 一次性扫描数据 | 污染缓存   | 隔离在考察区     |
+| 热点数据       | 可能被淘汰 | 保护在保护区     |
+| 内存利用率     | 一般       | 更优             |
+
+---
+
+### 5.6 调度器总结
+
+当前框架中注册的 14 个调度器覆盖了多种典型思想：
+
+- **经典缓存算法：** Greedy (Bélády-like), LRU, LFU
+- **时间结构化：** Wavefront（时域波前）、SlidingWindow（滑动窗口）
+- **访问结构感知：** OverlapAware（重叠）、Fragmentation（碎片）
+- **加载时机：** AggressivePrefetch（激进预取）、Lazy（延迟加载）、JustInTime（准时加载）
+- **策略组合：** Adaptive（自适应）、Generational（分代）
+- **基线方案：** BaseScheduler
+- **成本优化：** CostBenefit（收益/成本比）
+
+在实际运行中，由 `Dispatcher` 统一调用这些算法，对每个算法的输出做格式校验与官方 checker 验证，然后从所有合法结果中选取 `Fin` 最小的一个，作为最终提交的调度方案。这种"多策略赛马 + 外部 checker 把关"的设计，大幅提升了在复杂测试集上找到高质量解的可能性，同时也使得后续继续扩展算法变得非常简单。
 ## 6. 优化策略
 
 ### 6.1 同任务请求排序
@@ -1170,7 +1548,7 @@ if checker_enabled {
 ### 10.1 核心贡献
 
 1. **多策略调度框架**：
-   - 实现了10种不同调度策略
+   - 实现了14种不同调度策略
    - Dispatcher 自动选择最优结果
    - 基于 Trait 的可扩展架构
 
@@ -1223,8 +1601,10 @@ GMP_for_LLM/
 │       ├── slidingwindowgreedy_scheduler.rs
 │       ├── overlap_aware_eviction_scheduler.rs
 │       ├── cost_benefit_scheduler.rs
-│       └── lfu_scheduler.rs
-├── checker/                 # 验证工具
+│       ├── lfu_scheduler.rs
+│       ├── fragmentation_scheduler.rs
+│       ├── just_in_time_scheduler.rs     # JIT调度
+│       └── generational_scheduler.rs     # 分代调度
 ├── test_cases.json          # 测试用例
 ├── Cargo.toml               # 项目配置
 ├── README.md                # 使用说明
@@ -1317,13 +1697,14 @@ let results: Vec<_> = schedulers.par_iter()
 ### A. 完整代码统计
 
 ```
-总代码行数：~3200行
-├── 核心调度逻辑：~1800行
+总代码行数：~3500行
+├── 核心调度逻辑：~2100行
 ├── 数据结构和工具：~600行
 ├── Dispatcher 框架：~400行
 └── 测试和验证：~400行
 
 平均每个调度器：~150行
+调度器总数：14个
 ```
 
 ### B. 运行指南
