@@ -8,8 +8,12 @@
 pub mod greedy_scheduler;
 pub mod base_scheduler;
 pub mod lru_scheduler;
+pub mod aggressive_prefetch_scheduler;
+pub mod lazy_scheduler;
 
 // 重导出，方便使用
 pub use greedy_scheduler::GreedyScheduler;
 pub use base_scheduler::BaseScheduler;
 pub use lru_scheduler::LruScheduler;
+pub use aggressive_prefetch_scheduler::AggressivePrefetchScheduler;
+pub use lazy_scheduler::LazyScheduler;
