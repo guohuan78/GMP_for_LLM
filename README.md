@@ -106,6 +106,8 @@ cargo run < infile.txt > outfile.txt
 ./checker/checker infile.txt outfile.txt outfile.txt
 输出更多过程信息
 GMP_VERBOSE=1 cargo run test-json
+动态可视化工具
+python3 visualizer.py outfile.txt 
 ```
 
 如无法编译可直接使用二进制文件，同目录下gmp_for_llm，运行环境为Ubuntu 24.04.2 LTS x86_64
