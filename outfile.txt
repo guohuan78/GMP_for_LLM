@@ -1,6 +1,22 @@
-Reload 0 100 100
-Reload 4000 0 100
-Visit 8000 1
-Visit 8000 0
-Visit 13000 2
-Fin 13020
+Reload 0 0 120
+Reload 4800 120 100
+Visit 8800 0
+Visit 8800 1
+Offload 11800 0 20
+Reload 12600 240 120
+Visit 17400 2
+Offload 19400 240 20
+Reload 20200 220 20
+Visit 21000 3
+Offload 25000 20 90
+Reload 28600 360 90
+Visit 32200 4
+Offload 34200 260 20
+Reload 35000 100 10
+Reload 35400 240 10
+Visit 35800 5
+Offload 37800 100 150
+Offload 43800 280 50
+Reload 45800 500 200
+Visit 53800 6
+Fin 55800

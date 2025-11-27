@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HBM 内存状态可视化</title>
+    <style>
+        body { 
+            font-family: 'Consolas', 'Monaco', monospace; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            padding: 20px;
+            margin: 0;
+        }
+        h1 { 
+            text-align: center; 
+            color: #00d4ff;
+            margin: 20px 0;
+            font-size: 28px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .stats {
+            background: #252525;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #00d4ff;
+        }
+        .stats h2 {
+            color: #00d4ff;
+            margin: 0 0 15px 0;
+            font-size: 20px;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .stat-item {
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            color: #00ff88;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .timeline {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .event {
+            display: grid;
+            grid-template-columns: 80px 130px 180px 80px 1fr;
+            gap: 15px;
+            padding: 12px;
+            margin: 8px 0;
+            background: #1a1a1a;
+            border-radius: 4px;
+            border-left: 4px solid #444;
+            align-items: center;
+        }
+        .event.reload { border-left-color: #00ff88; }
+        .event.offload { border-left-color: #ff6b35; }
+        .event.visit { border-left-color: #9d4edd; }
+        .event.fin { border-left-color: #06ffa5; background: #1a2a1a; }
+        .time {
+            color: #00d4ff;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .operation {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .reload-op { color: #00ff88; }
+        .offload-op { color: #ff6b35; }
+        .visit-op { color: #9d4edd; }
+        .fin-op { color: #06ffa5; }
+        .detail {
+            color: #ffd60a;
+            font-family: monospace;
+        }
+        .hbm-usage {
+            color: #00d4ff;
+            font-weight: bold;
+            text-align: right;
+        }
+        .memory-bar-container {
+            position: relative;
+        }
+        .memory-bar {
+            height: 24px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+        .memory-segment {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(180deg, #00ff88, #00cc70);
+            border-right: 1px solid #1a1a1a;
+            box-sizing: border-box;
+        }
+        .memory-labels {
+            font-size: 10px;
+            color: #888;
+            margin-top: 2px;
+            height: 14px;
+            position: relative;
+        }
+        .memory-label {
+            position: absolute;
+            color: #00d4ff;
+            font-size: 9px;
+        }
+        .header-row {
+            display: grid;
+            grid-template-columns: 80px 130px 180px 80px 1fr;
+            gap: 15px;
+            padding: 12px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 HBM 内存状态可视化</h1>
+
+        <div class="stats">
+            <h2>📊 统计信息</h2>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <div class="stat-label">总完成时间</div>
+                    <div class="stat-value">55800</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Reload 次数 / 总量</div>
+                    <div class="stat-value">8 / 670</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Offload 次数 / 总量</div>
+                    <div class="stat-value">6 / 350</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Visit 次数</div>
+                    <div class="stat-value">7</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="timeline">
+            <div class="header-row">
+                <div>时间</div>
+                <div>操作</div>
+                <div>详情</div>
+                <div style="text-align: right;">HBM占用</div>
+                <div>内存块分布 (0 ~ 700)</div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">0</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[0+120]</div>
+                <div class="hbm-usage">120</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 0.00%; width: 17.14%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 0.00%;">0</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">4800</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[120+100]</div>
+                <div class="hbm-usage">220</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 0.00%; width: 17.14%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 0.00%;">0</span><span class="memory-label" style="left: 17.14%;">120</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">8800</div>
+                <div class="operation visit-op">✓ 访问 R0</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">220</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 0.00%; width: 17.14%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 0.00%;">0</span><span class="memory-label" style="left: 17.14%;">120</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">8800</div>
+                <div class="operation visit-op">✓ 访问 R1</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">220</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 0.00%; width: 17.14%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 0.00%;">0</span><span class="memory-label" style="left: 17.14%;">120</span></div>
+                </div>
+            </div>
+
+            <div class="event offload">
+                <div class="time">11800</div>
+                <div class="operation offload-op">⬇ 卸载</div>
+                <div class="detail">[0+20]</div>
+                <div class="hbm-usage">200</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 2.86%; width: 14.29%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 2.86%;">20</span><span class="memory-label" style="left: 17.14%;">120</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">12600</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[240+120]</div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 2.86%; width: 14.29%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 34.29%; width: 17.14%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 2.86%;">20</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 34.29%;">240</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">17400</div>
+                <div class="operation visit-op">✓ 访问 R2</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 2.86%; width: 14.29%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 34.29%; width: 17.14%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 2.86%;">20</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 34.29%;">240</span></div>
+                </div>
+            </div>
+
+            <div class="event offload">
+                <div class="time">19400</div>
+                <div class="operation offload-op">⬇ 卸载</div>
+                <div class="detail">[240+20]</div>
+                <div class="hbm-usage">300</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 2.86%; width: 14.29%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 37.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 2.86%;">20</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 37.14%;">260</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">20200</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[220+20]</div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 2.86%; width: 14.29%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 37.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 2.86%;">20</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 37.14%;">260</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">21000</div>
+                <div class="operation visit-op">✓ 访问 R3</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 2.86%; width: 14.29%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 37.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 2.86%;">20</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 37.14%;">260</span></div>
+                </div>
+            </div>
+
+            <div class="event offload">
+                <div class="time">25000</div>
+                <div class="operation offload-op">⬇ 卸载</div>
+                <div class="detail">[20+90]</div>
+                <div class="hbm-usage">230</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 37.14%; width: 14.29%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 37.14%;">260</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">28600</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[360+90]</div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 37.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 37.14%;">260</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">32200</div>
+                <div class="operation visit-op">✓ 访问 R4</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 37.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 37.14%;">260</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event offload">
+                <div class="time">34200</div>
+                <div class="operation offload-op">⬇ 卸载</div>
+                <div class="detail">[260+20]</div>
+                <div class="hbm-usage">300</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 40.00%; width: 11.43%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 40.00%;">280</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">35000</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[100+10]</div>
+                <div class="hbm-usage">310</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 14.29%; width: 1.43%;"></div><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 40.00%; width: 11.43%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 14.29%;">100</span><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 40.00%;">280</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">35400</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[240+10]</div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 14.29%; width: 1.43%;"></div><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 34.29%; width: 1.43%;"></div><div class="memory-segment" style="left: 40.00%; width: 11.43%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 14.29%;">100</span><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 34.29%;">240</span><span class="memory-label" style="left: 40.00%;">280</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">35800</div>
+                <div class="operation visit-op">✓ 访问 R5</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 14.29%; width: 1.43%;"></div><div class="memory-segment" style="left: 15.71%; width: 1.43%;"></div><div class="memory-segment" style="left: 17.14%; width: 14.29%;"></div><div class="memory-segment" style="left: 31.43%; width: 2.86%;"></div><div class="memory-segment" style="left: 34.29%; width: 1.43%;"></div><div class="memory-segment" style="left: 40.00%; width: 11.43%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 14.29%;">100</span><span class="memory-label" style="left: 15.71%;">110</span><span class="memory-label" style="left: 17.14%;">120</span><span class="memory-label" style="left: 31.43%;">220</span><span class="memory-label" style="left: 34.29%;">240</span><span class="memory-label" style="left: 40.00%;">280</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event offload">
+                <div class="time">37800</div>
+                <div class="operation offload-op">⬇ 卸载</div>
+                <div class="detail">[100+150]</div>
+                <div class="hbm-usage">170</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 40.00%; width: 11.43%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 40.00%;">280</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event offload">
+                <div class="time">43800</div>
+                <div class="operation offload-op">⬇ 卸载</div>
+                <div class="detail">[280+50]</div>
+                <div class="hbm-usage">120</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 47.14%; width: 4.29%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 47.14%;">330</span><span class="memory-label" style="left: 51.43%;">360</span></div>
+                </div>
+            </div>
+
+            <div class="event reload">
+                <div class="time">45800</div>
+                <div class="operation reload-op">⬆ 加载</div>
+                <div class="detail">[500+200]</div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 47.14%; width: 4.29%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div><div class="memory-segment" style="left: 71.43%; width: 28.57%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 47.14%;">330</span><span class="memory-label" style="left: 51.43%;">360</span><span class="memory-label" style="left: 71.43%;">500</span></div>
+                </div>
+            </div>
+
+            <div class="event visit">
+                <div class="time">53800</div>
+                <div class="operation visit-op">✓ 访问 R6</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 47.14%; width: 4.29%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div><div class="memory-segment" style="left: 71.43%; width: 28.57%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 47.14%;">330</span><span class="memory-label" style="left: 51.43%;">360</span><span class="memory-label" style="left: 71.43%;">500</span></div>
+                </div>
+            </div>
+
+            <div class="event fin">
+                <div class="time">55800</div>
+                <div class="operation fin-op">★ 完成</div>
+                <div class="detail"></div>
+                <div class="hbm-usage">320</div>
+                <div class="memory-bar-container">
+                    <div class="memory-bar"><div class="memory-segment" style="left: 47.14%; width: 4.29%;"></div><div class="memory-segment" style="left: 51.43%; width: 12.86%;"></div><div class="memory-segment" style="left: 71.43%; width: 28.57%;"></div></div>
+                    <div class="memory-labels"><span class="memory-label" style="left: 47.14%;">330</span><span class="memory-label" style="left: 51.43%;">360</span><span class="memory-label" style="left: 71.43%;">500</span></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

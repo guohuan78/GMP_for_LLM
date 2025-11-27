@@ -121,9 +121,9 @@
     }
   ],
   "metadata": {
-    "version": "1.0",
-    "created": "2025-11-24",
-    "description": "GMP for LLM 测试用例集",
+    "version": "1.6",
+    "created": "2025-11-20",
+    "description": "测试用例集",
     "total_cases": 17,
     "categories": {
       "基础测试": 3,
