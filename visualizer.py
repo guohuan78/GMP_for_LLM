@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """
-GMP for LLM - 内存调度可视化工具
-使用图形化方式展示 HBM 内存状态
+生成动态 HTML 可视化，支持步进控制
 """
 
 import re
 import sys
 from typing import List, Tuple, Dict
+import json
 
 
 class MemoryEvent:
-    """内存事件基类"""
     def __init__(self, timestamp: int):
         self.timestamp = timestamp
 
 
 class ReloadEvent(MemoryEvent):
-    """Reload事件"""
     def __init__(self, timestamp: int, addr: int, size: int):
         super().__init__(timestamp)
         self.addr = addr
@@ -24,7 +22,6 @@ class ReloadEvent(MemoryEvent):
 
 
 class OffloadEvent(MemoryEvent):
-    """Offload事件"""
     def __init__(self, timestamp: int, addr: int, size: int):
         super().__init__(timestamp)
         self.addr = addr
@@ -32,474 +29,541 @@ class OffloadEvent(MemoryEvent):
 
 
 class VisitEvent(MemoryEvent):
-    """Visit事件"""
     def __init__(self, timestamp: int, request_id: int):
         super().__init__(timestamp)
         self.request_id = request_id
 
 
 class FinEvent(MemoryEvent):
-    """Fin事件"""
     def __init__(self, timestamp: int):
         super().__init__(timestamp)
 
 
 def parse_output(lines: List[str]) -> List[MemoryEvent]:
-    """解析输出文件"""
     events = []
-    
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
         if line.startswith("Reload"):
             match = re.match(r'Reload\s+(\d+)\s+(\d+)\s+(\d+)', line)
             if match:
                 timestamp, addr, size = map(int, match.groups())
                 events.append(ReloadEvent(timestamp, addr, size))
-                
         elif line.startswith("Offload"):
             match = re.match(r'Offload\s+(\d+)\s+(\d+)\s+(\d+)', line)
             if match:
                 timestamp, addr, size = map(int, match.groups())
                 events.append(OffloadEvent(timestamp, addr, size))
-                
         elif line.startswith("Visit"):
             match = re.match(r'Visit\s+(\d+)\s+(\d+)', line)
             if match:
                 timestamp, request_id = map(int, match.groups())
                 events.append(VisitEvent(timestamp, request_id))
-                
         elif line.startswith("Fin"):
             match = re.match(r'Fin\s+(\d+)', line)
             if match:
                 timestamp = int(match.group(1))
                 events.append(FinEvent(timestamp))
-    
     return events
 
 
-def visualize_memory_blocks(state: Dict[int, int], max_addr: int, bar_width: int = 50) -> Tuple[str, str]:
-    """
-    图形化显示内存块分布
-    返回 (图形行, 标签行)
-    """
-    if not state:
-        return "░" * bar_width, " " * bar_width
-    
-    # 创建内存映射
-    memory_map = ['░'] * bar_width  # 空闲用 ░
-    labels = [' '] * bar_width
-    
-    # 计算比例
-    scale = max_addr / bar_width if max_addr > 0 else 1
-    
-    # 标记已占用的内存
-    for addr, size in sorted(state.items()):
-        start_pos = int(addr / scale)
-        end_pos = int((addr + size) / scale)
-        
-        # 确保至少显示1个字符
-        if start_pos == end_pos:
-            end_pos = start_pos + 1
-        
-        # 限制范围
-        start_pos = max(0, min(start_pos, bar_width - 1))
-        end_pos = max(0, min(end_pos, bar_width))
-        
-        # 填充内存块
-        for i in range(start_pos, end_pos):
-            memory_map[i] = '█'
-        
-        # 添加地址标签（在起始位置）
-        label = str(addr)
-        if start_pos + len(label) <= bar_width:
-            for i, ch in enumerate(label):
-                if start_pos + i < bar_width:
-                    labels[start_pos + i] = ch
-    
-    return ''.join(memory_map), ''.join(labels)
-
-
-def visualize_memory_state(events: List[MemoryEvent]):
-    """可视化 HBM 内存状态变化"""
-    
-    if not events:
-        print("没有事件可以可视化")
-        return
-    
-    # 找出最大地址用于缩放
-    max_addr = 0
+def generate_dynamic_html(events: List[MemoryEvent], output_file: str, hbm_capacity: int = 300):
+    # 找出虚拟地址空间最大值
+    max_vaddr = 0
     for event in events:
         if isinstance(event, ReloadEvent):
-            max_addr = max(max_addr, event.addr + event.size)
+            max_vaddr = max(max_vaddr, event.addr + event.size)
     
-    # 跟踪内存状态 - 使用区间来正确处理部分卸载
-    # 格式: {(start, end): True} 表示 [start, end) 区间被占用
-    current_blocks = {}
+    # 生成每一步的状态
+    states = []
+    regions = {}  # {addr: size}
     
-    print("\n" + "=" * 110)
-    print(" " * 40 + "HBM 内存状态可视化")
-    print("=" * 110)
-    print(f"{'时间':^8} | {'操作':^14} | {'详情':^18} | {'占用':^6} | 内存块分布 (0 ~ {max_addr})")
-    print("-" * 110)
-    
-    for event in sorted(events, key=lambda e: e.timestamp):
-        ts = event.timestamp
+    for event in events:
+        event_type = ""
+        event_desc = ""
         
         if isinstance(event, ReloadEvent):
-            # 加载：添加新的内存块
-            current_blocks[event.addr] = event.size
-            op = "⬆ 加载"
-            detail = f"[{event.addr}+{event.size}]"
-            
+            regions[event.addr] = event.size
+            event_type = "reload"
+            event_desc = f"加载虚拟地址 [{event.addr}, {event.addr + event.size}) 共 {event.size} 字节"
         elif isinstance(event, OffloadEvent):
-            # 卸载：需要处理部分卸载的情况
-            offload_start = event.addr
+            # 卸载虚拟地址范围 [event.addr, event.addr + event.size)
             offload_end = event.addr + event.size
+            regions_to_remove = []
+            regions_to_add = {}
             
-            # 找出所有与卸载区间重叠的内存块
-            blocks_to_update = []
-            for block_addr, block_size in list(current_blocks.items()):
-                block_end = block_addr + block_size
+            for region_start, region_size in list(regions.items()):
+                region_end = region_start + region_size
                 
-                # 检查是否有重叠
-                if not (block_end <= offload_start or block_addr >= offload_end):
-                    blocks_to_update.append((block_addr, block_size))
+                # 检查卸载范围与当前区域是否有重叠
+                if event.addr < region_end and offload_end > region_start:
+                    overlap_start = max(event.addr, region_start)
+                    overlap_end = min(offload_end, region_end)
+                    
+                    regions_to_remove.append(region_start)
+                    
+                    # 保留卸载范围之前的部分
+                    if region_start < overlap_start:
+                        regions_to_add[region_start] = overlap_start - region_start
+                    
+                    # 保留卸载范围之后的部分
+                    if region_end > overlap_end:
+                        regions_to_add[overlap_end] = region_end - overlap_end
             
-            # 处理每个重叠的块
-            for block_addr, block_size in blocks_to_update:
-                block_end = block_addr + block_size
-                
-                # 删除原块
-                del current_blocks[block_addr]
-                
-                # 计算剩余部分
-                # 左边剩余部分: [block_addr, offload_start)
-                if block_addr < offload_start:
-                    left_size = offload_start - block_addr
-                    current_blocks[block_addr] = left_size
-                
-                # 右边剩余部分: [offload_end, block_end)
-                if block_end > offload_end:
-                    right_size = block_end - offload_end
-                    current_blocks[offload_end] = right_size
+            for region_start in regions_to_remove:
+                del regions[region_start]
+            regions.update(regions_to_add)
             
-            op = "⬇ 卸载"
-            detail = f"[{event.addr}+{event.size}]"
-            
+            event_type = "offload"
+            event_desc = f"卸载虚拟地址 [{event.addr}, {event.addr + event.size}) 共 {event.size} 字节"
         elif isinstance(event, VisitEvent):
-            op = f"✓ 访问 R{event.request_id}"
-            detail = ""
-            
+            event_type = "visit"
+            event_desc = f"访问请求 R{event.request_id}"
         elif isinstance(event, FinEvent):
-            op = "★ 完成"
-            detail = ""
-        else:
-            continue
+            event_type = "fin"
+            event_desc = "所有请求完成"
         
-        # 计算当前 HBM 总占用
-        total = sum(current_blocks.values())
+        usage = sum(regions.values())
         
-        # 生成图形化内存块显示
-        bar, labels = visualize_memory_blocks(current_blocks, max_addr, bar_width=50)
-        
-        # 打印事件行和内存块图形
-        print(f"{ts:8d} | {op:^14} | {detail:^18} | {total:6d} | {bar}")
-        if labels.strip():  # 只有当有标签时才打印
-            print(f"{'':8} | {'':^14} | {'':^18} | {'':^6} | {labels}")
-    
-    print("=" * 110)
-
-
-def visualize_html(events: List[MemoryEvent], output_file: str = "memory_timeline.html"):
-    """生成 HTML 可视化"""
-    
-    if not events:
-        print("没有事件可以可视化")
-        return
-    
-    # 找出最大地址
-    max_addr = 0
-    for event in events:
-        if isinstance(event, ReloadEvent):
-            max_addr = max(max_addr, event.addr + event.size)
-    
-    # 跟踪内存状态
-    memory_history = []
-    current_blocks = {}
-    
-    for event in sorted(events, key=lambda e: e.timestamp):
-        if isinstance(event, ReloadEvent):
-            current_blocks[event.addr] = event.size
-            
-        elif isinstance(event, OffloadEvent):
-            # 卸载：处理部分卸载
-            offload_start = event.addr
-            offload_end = event.addr + event.size
-            
-            blocks_to_update = []
-            for block_addr, block_size in list(current_blocks.items()):
-                block_end = block_addr + block_size
-                if not (block_end <= offload_start or block_addr >= offload_end):
-                    blocks_to_update.append((block_addr, block_size))
-            
-            for block_addr, block_size in blocks_to_update:
-                block_end = block_addr + block_size
-                del current_blocks[block_addr]
-                
-                if block_addr < offload_start:
-                    current_blocks[block_addr] = offload_start - block_addr
-                
-                if block_end > offload_end:
-                    current_blocks[offload_end] = block_end - offload_end
-        
-        memory_history.append((event.timestamp, dict(current_blocks), event))
+        states.append({
+            'timestamp': event.timestamp,
+            'type': event_type,
+            'desc': event_desc,
+            'usage': usage,
+            'regions': list(sorted(regions.items()))
+        })
     
     # 生成 HTML
-    html = """<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>HBM 内存状态可视化</title>
+    <title>HBM 动态可视化</title>
     <style>
-        body { 
-            font-family: 'Consolas', 'Monaco', monospace; 
-            background: #1a1a1a; 
-            color: #e0e0e0; 
-            padding: 20px;
+        * {{
             margin: 0;
-        }
-        h1 { 
-            text-align: center; 
-            color: #00d4ff;
-            margin: 20px 0;
-            font-size: 28px;
-        }
-        .container {
-            max-width: 1400px;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }}
+        .container {{
+            max-width: 1200px;
             margin: 0 auto;
-        }
-        .stats {
-            background: #252525;
+        }}
+        h1 {{
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 32px;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }}
+        .subtitle {{
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }}
+        .controls {{
+            background: rgba(37, 37, 37, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            border: 1px solid #333;
+        }}
+        button {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }}
+        button:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }}
+        button:active {{
+            transform: translateY(0);
+        }}
+        button:disabled {{
+            background: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }}
+        .step-info {{
+            flex: 1;
+            min-width: 200px;
+            text-align: center;
+            font-size: 16px;
+            color: #00d4ff;
+            font-weight: bold;
+        }}
+        .speed-control {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        input[type="range"] {{
+            width: 150px;
+        }}
+        .main-display {{
+            background: rgba(37, 37, 37, 0.8);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }}
+        .event-banner {{
             padding: 20px;
             border-radius: 8px;
-            margin: 20px 0;
-            border-left: 4px solid #00d4ff;
-        }
-        .stats h2 {
-            color: #00d4ff;
-            margin: 0 0 15px 0;
-            font-size: 20px;
-        }
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        .stat-item {
-            background: #1a1a1a;
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid #333;
-        }
-        .stat-label {
-            color: #888;
-            font-size: 12px;
-            margin-bottom: 5px;
-        }
-        .stat-value {
+            margin-bottom: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            border-left: 5px solid;
+            transition: all 0.3s;
+        }}
+        .event-reload {{
+            background: rgba(0, 255, 136, 0.1);
+            border-color: #00ff88;
             color: #00ff88;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .timeline {
-            background: #252525;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        .event {
-            display: grid;
-            grid-template-columns: 80px 130px 180px 80px 1fr;
-            gap: 15px;
-            padding: 12px;
-            margin: 8px 0;
-            background: #1a1a1a;
-            border-radius: 4px;
-            border-left: 4px solid #444;
-            align-items: center;
-        }
-        .event.reload { border-left-color: #00ff88; }
-        .event.offload { border-left-color: #ff6b35; }
-        .event.visit { border-left-color: #9d4edd; }
-        .event.fin { border-left-color: #06ffa5; background: #1a2a1a; }
-        .time {
+        }}
+        .event-offload {{
+            background: rgba(255, 107, 53, 0.1);
+            border-color: #ff6b35;
+            color: #ff6b35;
+        }}
+        .event-visit {{
+            background: rgba(157, 78, 221, 0.1);
+            border-color: #9d4edd;
+            color: #9d4edd;
+        }}
+        .event-fin {{
+            background: rgba(6, 255, 165, 0.1);
+            border-color: #06ffa5;
+            color: #06ffa5;
+        }}
+        .usage-bar {{
+            margin-bottom: 30px;
+        }}
+        .usage-label {{
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }}
+        .usage-text {{
             color: #00d4ff;
             font-weight: bold;
-            font-size: 14px;
-        }
-        .operation {
-            font-weight: bold;
-            font-size: 14px;
-        }
-        .reload-op { color: #00ff88; }
-        .offload-op { color: #ff6b35; }
-        .visit-op { color: #9d4edd; }
-        .fin-op { color: #06ffa5; }
-        .detail {
-            color: #ffd60a;
-            font-family: monospace;
-        }
-        .hbm-usage {
-            color: #00d4ff;
-            font-weight: bold;
-            text-align: right;
-        }
-        .memory-bar-container {
-            position: relative;
-        }
-        .memory-bar {
-            height: 24px;
+        }}
+        .progress-container {{
+            height: 30px;
             background: #2a2a2a;
-            border-radius: 4px;
-            position: relative;
+            border-radius: 15px;
             overflow: hidden;
-            border: 1px solid #444;
-        }
-        .memory-segment {
+            position: relative;
+            border: 2px solid #444;
+        }}
+        .progress-bar {{
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }}
+        .memory-viz {{
+            margin-bottom: 30px;
+        }}
+        .memory-label {{
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #00d4ff;
+            font-weight: bold;
+        }}
+        .memory-bar {{
+            height: 40px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            position: relative;
+            border: 2px solid #444;
+            overflow: hidden;
+        }}
+        .memory-segment {{
             position: absolute;
             height: 100%;
             background: linear-gradient(180deg, #00ff88, #00cc70);
-            border-right: 1px solid #1a1a1a;
-            box-sizing: border-box;
-        }
-        .memory-labels {
-            font-size: 10px;
-            color: #888;
-            margin-top: 2px;
-            height: 14px;
-            position: relative;
-        }
-        .memory-label {
-            position: absolute;
+            border-right: 2px solid #1a1a1a;
+            transition: all 0.5s ease;
+        }}
+        .memory-segment:hover {{
+            filter: brightness(1.2);
+            z-index: 10;
+        }}
+        .regions-list {{
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }}
+        .regions-title {{
             color: #00d4ff;
-            font-size: 9px;
-        }
-        .header-row {
-            display: grid;
-            grid-template-columns: 80px 130px 180px 80px 1fr;
-            gap: 15px;
-            padding: 12px;
-            background: #2a2a2a;
-            border-radius: 4px;
-            margin-bottom: 10px;
             font-weight: bold;
-            color: #00d4ff;
-        }
+            margin-bottom: 15px;
+            font-size: 16px;
+        }}
+        .region-item {{
+            padding: 10px;
+            margin: 8px 0;
+            background: rgba(0, 212, 255, 0.05);
+            border-left: 3px solid #00d4ff;
+            border-radius: 4px;
+            font-family: monospace;
+            transition: all 0.3s;
+        }}
+        .region-item:hover {{
+            background: rgba(0, 212, 255, 0.1);
+            transform: translateX(5px);
+        }}
+        .tooltip {{
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            border: 1px solid #00d4ff;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🧠 HBM 内存状态可视化</h1>
-"""
-    
-    # 统计信息
-    reload_count = sum(1 for e in events if isinstance(e, ReloadEvent))
-    offload_count = sum(1 for e in events if isinstance(e, OffloadEvent))
-    visit_count = sum(1 for e in events if isinstance(e, VisitEvent))
-    reload_total = sum(e.size for e in events if isinstance(e, ReloadEvent))
-    offload_total = sum(e.size for e in events if isinstance(e, OffloadEvent))
-    fin_time = next((e.timestamp for e in events if isinstance(e, FinEvent)), 0)
-    
-    html += f"""
-        <div class="stats">
-            <h2>📊 统计信息</h2>
-            <div class="stat-grid">
-                <div class="stat-item">
-                    <div class="stat-label">总完成时间</div>
-                    <div class="stat-value">{fin_time}</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Reload 次数 / 总量</div>
-                    <div class="stat-value">{reload_count} / {reload_total}</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Offload 次数 / 总量</div>
-                    <div class="stat-value">{offload_count} / {offload_total}</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Visit 次数</div>
-                    <div class="stat-value">{visit_count}</div>
-                </div>
+        <h1>🧠 HBM 虚拟内存动态可视化</h1>
+        <div class="subtitle">逐步查看虚拟地址空间在 HBM 中的加载过程</div>
+        
+        <div class="controls">
+            <button onclick="firstStep()">⏮ 第一步</button>
+            <button onclick="prevStep()">◀ 上一步</button>
+            <button onclick="playPause()" id="playBtn">▶ 播放</button>
+            <button onclick="nextStep()">下一步 ▶</button>
+            <button onclick="lastStep()">最后一步 ⏭</button>
+            
+            <div class="step-info" id="stepInfo">步骤 1/{len(states)}</div>
+            
+            <div class="speed-control">
+                <label>速度:</label>
+                <input type="range" id="speedSlider" min="100" max="2000" value="1000" step="100">
+                <span id="speedLabel">1.0x</span>
             </div>
         </div>
         
-        <div class="timeline">
-            <div class="header-row">
-                <div>时间</div>
-                <div>操作</div>
-                <div>详情</div>
-                <div style="text-align: right;">HBM占用</div>
-                <div>内存块分布 (0 ~ {max_addr})</div>
+        <div class="main-display">
+            <div class="event-banner" id="eventBanner">
+                准备开始...
             </div>
-"""
-    
-    for ts, state, event in memory_history:
-        if isinstance(event, ReloadEvent):
-            event_class = "reload"
-            op_class = "reload-op"
-            operation = "⬆ 加载"
-            detail = f"[{event.addr}+{event.size}]"
-        elif isinstance(event, OffloadEvent):
-            event_class = "offload"
-            op_class = "offload-op"
-            operation = "⬇ 卸载"
-            detail = f"[{event.addr}+{event.size}]"
-        elif isinstance(event, VisitEvent):
-            event_class = "visit"
-            op_class = "visit-op"
-            operation = f"✓ 访问 R{event.request_id}"
-            detail = ""
-        elif isinstance(event, FinEvent):
-            event_class = "fin"
-            op_class = "fin-op"
-            operation = "★ 完成"
-            detail = ""
-        else:
-            continue
-        
-        total_memory = sum(state.values())
-        
-        # 生成内存条图形
-        segments_html = ""
-        labels_html = ""
-        for addr, size in sorted(state.items()):
-            left_percent = (addr / max_addr * 100) if max_addr > 0 else 0
-            width_percent = (size / max_addr * 100) if max_addr > 0 else 0
-            segments_html += f'<div class="memory-segment" style="left: {left_percent:.2f}%; width: {width_percent:.2f}%;"></div>'
-            labels_html += f'<span class="memory-label" style="left: {left_percent:.2f}%;">{addr}</span>'
-        
-        if not segments_html:
-            segments_html = '<div style="text-align: center; line-height: 24px; color: #666;">(空)</div>'
-        
-        html += f"""
-            <div class="event {event_class}">
-                <div class="time">{ts}</div>
-                <div class="operation {op_class}">{operation}</div>
-                <div class="detail">{detail}</div>
-                <div class="hbm-usage">{total_memory}</div>
-                <div class="memory-bar-container">
-                    <div class="memory-bar">{segments_html}</div>
-                    <div class="memory-labels">{labels_html}</div>
+            
+            <div class="usage-bar">
+                <div class="usage-label">
+                    <span class="usage-text">HBM 使用量</span>
+                    <span id="usageText">0 / {hbm_capacity} (0.0%)</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
                 </div>
             </div>
-"""
-    
-    html += """
+            
+            <div class="memory-viz">
+                <div class="memory-label">虚拟地址空间 [0 ~ {max_vaddr}]</div>
+                <div class="memory-bar" id="memoryBar"></div>
+            </div>
+            
+            <div class="regions-list">
+                <div class="regions-title">HBM 中的虚拟内存区域</div>
+                <div id="regionsList">
+                    <div style="color: #888; text-align: center; padding: 20px;">
+                        (空)
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+    
+    <div class="tooltip" id="tooltip"></div>
+    
+    <script>
+        const states = {json.dumps(states)};
+        const maxVaddr = {max_vaddr};
+        const hbmCapacity = {hbm_capacity};
+        
+        let currentStep = 0;
+        let isPlaying = false;
+        let playInterval = null;
+        
+        function updateDisplay() {{
+            if (currentStep < 0 || currentStep >= states.length) return;
+            
+            const state = states[currentStep];
+            
+            // 更新步骤信息
+            document.getElementById('stepInfo').textContent = 
+                `步骤 ${{currentStep + 1}}/${{states.length}} | 时间: ${{state.timestamp}}`;
+            
+            // 更新事件横幅
+            const banner = document.getElementById('eventBanner');
+            banner.textContent = state.desc;
+            banner.className = 'event-banner event-' + state.type;
+            
+            // 更新使用量
+            const usage = state.usage;
+            const percentage = (usage / hbmCapacity * 100).toFixed(1);
+            document.getElementById('usageText').textContent = 
+                `${{usage}} / ${{hbmCapacity}} (${{percentage}}%)`;
+            
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+            
+            // 更新内存条
+            const memoryBar = document.getElementById('memoryBar');
+            memoryBar.innerHTML = '';
+            
+            state.regions.forEach(([addr, size]) => {{
+                const segment = document.createElement('div');
+                segment.className = 'memory-segment';
+                const left = (addr / maxVaddr * 100).toFixed(2);
+                const width = (size / maxVaddr * 100).toFixed(2);
+                segment.style.left = left + '%';
+                segment.style.width = width + '%';
+                segment.title = `[${{addr}}, ${{addr + size}}) = ${{size}} 字节`;
+                
+                segment.addEventListener('mouseenter', (e) => {{
+                    const tooltip = document.getElementById('tooltip');
+                    tooltip.textContent = segment.title;
+                    tooltip.style.display = 'block';
+                }});
+                
+                segment.addEventListener('mousemove', (e) => {{
+                    const tooltip = document.getElementById('tooltip');
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                }});
+                
+                segment.addEventListener('mouseleave', () => {{
+                    document.getElementById('tooltip').style.display = 'none';
+                }});
+                
+                memoryBar.appendChild(segment);
+            }});
+            
+            // 更新区域列表
+            const regionsList = document.getElementById('regionsList');
+            if (state.regions.length === 0) {{
+                regionsList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">(空)</div>';
+            }} else {{
+                regionsList.innerHTML = state.regions.map(([addr, size]) => 
+                    `<div class="region-item">[${{addr.toString().padStart(4)}},${{(addr + size).toString().padStart(4)}}) = ${{size.toString().padStart(3)}} 字节</div>`
+                ).join('');
+            }}
+        }}
+        
+        function firstStep() {{
+            currentStep = 0;
+            updateDisplay();
+        }}
+        
+        function lastStep() {{
+            currentStep = states.length - 1;
+            updateDisplay();
+        }}
+        
+        function prevStep() {{
+            if (currentStep > 0) {{
+                currentStep--;
+                updateDisplay();
+            }}
+        }}
+        
+        function nextStep() {{
+            if (currentStep < states.length - 1) {{
+                currentStep++;
+                updateDisplay();
+            }} else {{
+                pause();
+            }}
+        }}
+        
+        function play() {{
+            isPlaying = true;
+            document.getElementById('playBtn').textContent = '⏸ 暂停';
+            const speed = parseInt(document.getElementById('speedSlider').value);
+            playInterval = setInterval(() => {{
+                nextStep();
+            }}, speed);
+        }}
+        
+        function pause() {{
+            isPlaying = false;
+            document.getElementById('playBtn').textContent = '▶ 播放';
+            if (playInterval) {{
+                clearInterval(playInterval);
+                playInterval = null;
+            }}
+        }}
+        
+        function playPause() {{
+            if (isPlaying) {{
+                pause();
+            }} else {{
+                play();
+            }}
+        }}
+        
+        // 速度滑块
+        document.getElementById('speedSlider').addEventListener('input', (e) => {{
+            const speed = parseInt(e.target.value);
+            const speedFactor = (2100 - speed) / 1000;
+            document.getElementById('speedLabel').textContent = speedFactor.toFixed(1) + 'x';
+            
+            if (isPlaying) {{
+                pause();
+                play();
+            }}
+        }});
+        
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {{
+            if (e.key === 'ArrowLeft') prevStep();
+            else if (e.key === 'ArrowRight') nextStep();
+            else if (e.key === ' ') {{
+                e.preventDefault();
+                playPause();
+            }}
+            else if (e.key === 'Home') firstStep();
+            else if (e.key === 'End') lastStep();
+        }});
+        
+        // 初始化
+        updateDisplay();
+    </script>
 </body>
 </html>
 """
@@ -507,57 +571,47 @@ def visualize_html(events: List[MemoryEvent], output_file: str = "memory_timelin
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html)
     
-    print(f"\n✅ HTML可视化已保存到: {output_file}")
-
-
-def print_statistics(events: List[MemoryEvent]):
-    """打印统计信息"""
-    reload_count = sum(1 for e in events if isinstance(e, ReloadEvent))
-    offload_count = sum(1 for e in events if isinstance(e, OffloadEvent))
-    visit_count = sum(1 for e in events if isinstance(e, VisitEvent))
-    
-    reload_total_size = sum(e.size for e in events if isinstance(e, ReloadEvent))
-    offload_total_size = sum(e.size for e in events if isinstance(e, OffloadEvent))
-    
-    fin_time = next((e.timestamp for e in events if isinstance(e, FinEvent)), 0)
-    
-    print("\n" + "=" * 60)
-    print(" " * 22 + "统计信息")
-    print("=" * 60)
-    print(f"  总完成时间:     {fin_time}")
-    print(f"  Reload 次数:    {reload_count} (总量: {reload_total_size})")
-    print(f"  Offload 次数:   {offload_count} (总量: {offload_total_size})")
-    print(f"  Visit 次数:     {visit_count}")
-    print("=" * 60)
+    print(f"✅ 动态 HTML 可视化已保存到: {output_file}")
+    print(f"   总步骤数: {len(states)}")
+    print(f"   虚拟地址空间: [0, {max_vaddr})")
+    print(f"   HBM 容量: {hbm_capacity}")
 
 
 def main():
-    """主函数"""
-    if len(sys.argv) > 1:
-        input_file = sys.argv[1]
-        with open(input_file, 'r') as f:
-            lines = f.readlines()
-    else:
-        print("用法: python3 visualizer.py <output_file>")
-        print("示例: python3 visualizer.py outfile.txt")
+    if len(sys.argv) < 2:
+        print("用法: python3 visualizer_dynamic_html.py <output_file> [hbm_capacity]")
+        print("示例: python3 visualizer_dynamic_html.py outfile.txt 300")
         return
     
-    # 解析事件
+    input_file = sys.argv[1]
+    
+    with open(input_file, 'r') as f:
+        lines = f.readlines()
+    
+    # 尝试从对应的 infile.txt 读取 HBM 容量
+    hbm_capacity = 300  # 默认值
+    infile_path = input_file.replace('outfile', 'infile')
+    try:
+        with open(infile_path, 'r') as f:
+            first_line = f.readline().strip().split()
+            if len(first_line) >= 2:
+                hbm_capacity = int(first_line[1])  # m (HBM capacity)
+                print(f"从 {infile_path} 读取 HBM 容量: {hbm_capacity}")
+    except:
+        pass
+    
+    # 命令行参数可以覆盖
+    if len(sys.argv) > 2:
+        hbm_capacity = int(sys.argv[2])
+    
     events = parse_output(lines)
     
     if not events:
         print("错误: 没有解析到任何事件")
         return
     
-    # 打印统计信息
-    print_statistics(events)
-    
-    # 文本可视化 - 图形化展示内存块
-    visualize_memory_state(events)
-    
-    # 生成 HTML 可视化
-    html_file = input_file.replace('.txt', '.html')
-    visualize_html(events, html_file)
+    output_file = input_file.replace('.txt', '_dynamic.html')
+    generate_dynamic_html(events, output_file, hbm_capacity)
 
 
 if __name__ == "__main__":
