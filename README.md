@@ -1,5 +1,7 @@
 # **MemoRace系统架构：基于多策略竞速的元调度框架**
 
+最终成绩：一等奖！！！[决赛成绩公布](https://gitee.com/openeuler/heterogeneous_systems_programming/blob/master/2025/final_result.md)
+
 ## **队伍介绍**
 
 ```
